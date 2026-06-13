@@ -7,30 +7,16 @@ features:
     display_name: conductor
     always_online: true
   slash_commands:
+    # Slimmed: research / apply / move / fix are now buttons on the job card.
     - command: /add
       url: https://job-slack.cameronaziz.workers.dev/commands/add
-      description: Add Job
-      usage_hint: "/add {link}"
+      description: Add a job to the pipeline
+      usage_hint: "{link}"
       should_escape: false
-    - command: /research
-      url: https://job-slack.cameronaziz.workers.dev/commands/research
-      description: Research Company
-      usage_hint: "/research [deep | surface]"
-      should_escape: false
-    - command: /apply
-      url: https://job-slack.cameronaziz.workers.dev/commands/apply
-      description: Prepare application package
-      usage_hint: "/apply"
-      should_escape: false
-    - command: /move
-      url: https://job-slack.cameronaziz.workers.dev/commands/move
-      description: Stage or park this job
-      usage_hint: "/move [park{archive} | stage{apply}]"
-      should_escape: false
-    - command: /fix
-      url: https://job-slack.cameronaziz.workers.dev/commands/fix
-      description: Improve this job
-      usage_hint: "/fix [content | layout | (free form)]"
+    - command: /jobs
+      url: https://job-slack.cameronaziz.workers.dev/commands/jobs
+      description: List the jobs in the pipeline
+      usage_hint: "[active | staged | parked]"
       should_escape: false
 oauth_config:
   redirect_urls:
@@ -54,7 +40,9 @@ oauth_config:
       - users:read.email
       - files:read
     bot:
+      - commands              # required for any slash command
       - chat:write
+      - chat:write.customize
       - channels:history
       - channels:read
       - channels:join
@@ -66,17 +54,20 @@ oauth_config:
       - links:read
       - links:write
       - reactions:write
-      - chat:write.customize
+      - files:write          # NEW: attach the brief + resume PDF in-thread (retires the Slack File Upload skill)
   pkce_enabled: false
 settings:
+  interactivity:
+    is_enabled: true
+    # NEW: buttons + modals (block_actions / view_submission) post here.
+    request_url: https://job-slack.cameronaziz.workers.dev/slack/interactivity
   event_subscriptions:
     request_url: https://hyperagent.com/api/slack/events/09cf31d3-5e72-429b-be21-41ba2a2ce090
     bot_events:
+      # Dropped message.channels/groups/im: no passive listening. The agent only
+      # runs on explicit slash commands (via the worker) and direct @mentions.
       - app_mention
       - link_shared
-      - message.channels
-      - message.groups
-      - message.im
   org_deploy_enabled: false
   socket_mode_enabled: false
   token_rotation_enabled: false
