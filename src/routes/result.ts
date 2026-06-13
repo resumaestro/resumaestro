@@ -5,15 +5,13 @@ import type { Env, JobRow } from '../types';
 import { JSON_H } from '../types';
 import { getJob, updateJob, upsertCompany } from '../db';
 import { cardBlocks } from '../blocks';
-import { updateMsg, postMsg, uploadToThread, publishHome, wakeAgent, moveThread } from '../slack';
+import { safeUpdateCard, postMsg, uploadToThread, publishHome, wakeAgent, moveThread } from '../slack';
 
 export async function handleJobResult(env: Env, id: string, body: Record<string, unknown>): Promise<Response> {
   const job = await getJob(env, id);
   if (!job) return new Response(JSON.stringify({ error: 'job not found' }), { status: 404, headers: JSON_H });
   if (!job.channel_id || !job.card_ts) return new Response(JSON.stringify({ error: 'no slack coordinates' }), { status: 422, headers: JSON_H });
 
-  const ch = job.channel_id;
-  const ct = job.card_ts;
   const rootTs = job.root_ts ?? '';
 
   // After any result, refresh the owner's App Home
@@ -47,7 +45,7 @@ export async function handleJobResult(env: Env, id: string, body: Record<string,
       status: 'scored',
     });
     const updated = await getJob(env, id);
-    await updateMsg(env, ch, ct, `${updated!.company ?? ''} — ${updated!.role ?? ''}`, cardBlocks(updated!));
+    await safeUpdateCard(env, updated!, `${updated!.company ?? ''} — ${updated!.role ?? ''}`, cardBlocks(updated!));
     await homeRefresh();
   }
 
@@ -61,12 +59,12 @@ export async function handleJobResult(env: Env, id: string, body: Record<string,
       queued_next: 'none',
     });
     const updated = await getJob(env, id);
-    await updateMsg(env, ch, ct, 'Research complete', cardBlocks(updated!));
+    await safeUpdateCard(env, updated!, 'Research complete', cardBlocks(updated!));
 
     if (body.brief_key && rootTs) {
-      await uploadToThread(env, body.brief_key as string, ch, rootTs, 'Research Brief', (body.summary as string) || 'Research complete.');
+      await uploadToThread(env, body.brief_key as string, job.channel_id, rootTs, 'Research Brief', (body.summary as string) || 'Research complete.');
     } else if (body.summary && rootTs) {
-      await postMsg(env, ch, body.summary as string, undefined, rootTs);
+      await postMsg(env, job.channel_id, body.summary as string, undefined, rootTs);
     }
 
     if (queuedTailor) await wakeAgent(env, 'tailor', id);
@@ -83,17 +81,18 @@ export async function handleJobResult(env: Env, id: string, body: Record<string,
       queued_next: 'none',
     });
     const updated = await getJob(env, id);
-    await updateMsg(env, ch, ct, 'Tailoring complete', cardBlocks(updated!));
+    await safeUpdateCard(env, updated!, 'Tailoring complete', cardBlocks(updated!));
 
     if (body.resume_pdf_key && rootTs) {
-      await uploadToThread(env, body.resume_pdf_key as string, ch, rootTs, 'Tailored Resume', (body.decisions as string) || 'Tailoring complete.');
+      await uploadToThread(env, body.resume_pdf_key as string, job.channel_id, rootTs, 'Tailored Resume', (body.decisions as string) || 'Tailoring complete.');
     }
 
     if (queuedStage && env.STAGE_CHANNEL) {
       const stageJob = await getJob(env, id);
       if (stageJob) {
         await updateJob(env, id, { status: 'staging' });
-        await updateMsg(env, ch, ct, 'Staging…', cardBlocks({ ...stageJob, status: 'staging' } as JobRow));
+        const stagingJob = await getJob(env, id);
+        await safeUpdateCard(env, stagingJob!, 'Staging…', cardBlocks(stagingJob!));
         await moveThread(env, stageJob, env.STAGE_CHANNEL);
       }
     }

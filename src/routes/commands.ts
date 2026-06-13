@@ -3,7 +3,7 @@
 import type { Env, JobRow } from '../types';
 import { makeJobId, createJob, updateJob, listJobs } from '../db';
 import { cardBlocks, jobsListBlocks } from '../blocks';
-import { postMsg, wakeAgent, publishHome } from '../slack';
+import { slackApi, postMsg, wakeAgent, publishHome } from '../slack';
 
 // ---- /commands/add --------------------------------------------------------
 //
@@ -44,9 +44,56 @@ export async function handleAddCommand(env: Env, payload: Record<string, string>
   for (const url of urls) {
     const id = await makeJobId(url);
 
-    // Dedup — silently skip URLs already in the pipeline.
-    const existing = await env.DB.prepare('SELECT id FROM jobs WHERE listing_url = ?').bind(url).first<{ id: string }>();
-    if (existing) continue;
+    // Dedup — check whether the URL is already in the pipeline.
+    const existing = await env.DB.prepare('SELECT * FROM jobs WHERE listing_url = ?').bind(url).first<JobRow>();
+    if (existing) {
+      // Probe whether the Slack card still exists.
+      const cardAlive = existing.card_ts && existing.channel_id
+        ? (await slackApi(env, 'chat.getPermalink', { channel: existing.channel_id, message_ts: existing.card_ts }) as Record<string, unknown>).ok === true
+        : false;
+
+      if (!cardAlive) {
+        // Card is gone — also check whether the root message still exists.
+        // If root is alive we can thread under it; if not we need a fresh root.
+        const rootAlive = existing.root_ts && existing.channel_id
+          ? (await slackApi(env, 'chat.getPermalink', { channel: existing.channel_id, message_ts: existing.root_ts }) as Record<string, unknown>).ok === true
+          : false;
+
+        let rootTs = existing.root_ts;
+        if (!rootAlive) {
+          // Root is also gone — post a new root message and record it.
+          rootTs = await postMsg(env, channel, url);
+          await updateJob(env, existing.id, { root_ts: rootTs, channel_id: channel });
+        }
+
+        // Re-post the card under the (existing or new) root.
+        const freshJob = { ...existing, root_ts: rootTs, card_ts: null, status: 'scoring' } as JobRow;
+        const newCardTs = await postMsg(env, channel, 'Scanning…', cardBlocks(freshJob), rootTs!);
+        await updateJob(env, existing.id, {
+          card_ts: newCardTs,
+          status: 'scoring',
+          owner_id: ownerId ?? existing.owner_id,
+        });
+        await wakeAgent(env, 'surface_scan', existing.id, { listing_url: url });
+        if (ownerId) await publishHome(env, ownerId);
+        continue;
+      }
+
+      // Thread is alive — show its current status as an ephemeral.
+      const tsSafe = existing.root_ts?.replace('.', '') ?? '';
+      const threadLink = tsSafe
+        ? `<slack://channel?team=${payload.team_id}&id=${existing.channel_id ?? channel}&message=${tsSafe}|open thread>`
+        : '';
+      const statusLine = existing.status === 'scoring'
+        ? `Still scanning${threadLink ? ` — ${threadLink}` : ''}. Delete the thread and re-add to restart.`
+        : `Already in pipeline *(${existing.status})*${threadLink ? ` — ${threadLink}` : ''}.`;
+      await fetch(payload.response_url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ response_type: 'ephemeral', text: statusLine }),
+      });
+      continue;
+    }
 
     // 1. Create D1 row (status: scoring)
     await createJob(env, { id, listing_url: url, channel_id: channel, owner_id: ownerId, status: 'scoring' });
@@ -69,6 +116,18 @@ export async function handleAddCommand(env: Env, payload: Record<string, string>
     // 4. Persist Slack coordinates + wake agent
     await updateJob(env, id, { root_ts: rootTs, card_ts: cardTs });
     await wakeAgent(env, 'surface_scan', id, { listing_url: url });
+
+    // 5. Warn if the agent webhook isn't configured yet.
+    if (!env.AGENT_WEBHOOK_URL) {
+      await fetch(payload.response_url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          response_type: 'ephemeral',
+          text: '⚠️ `AGENT_WEBHOOK_URL` is not set — job added but the scan will not start until it is configured in `wrangler.toml`.',
+        }),
+      });
+    }
   }
 
   // Refresh the owner's App Home once after all jobs are queued.

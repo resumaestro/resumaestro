@@ -49,6 +49,20 @@ export async function updateMsg(env: Env, channel: string, ts: string, text: str
   await slackApi(env, 'chat.update', { channel, ts, text, blocks });
 }
 
+// Safe card update — if the card message has been deleted, re-posts it into
+// the same thread and writes the new card_ts back to D1. Use this everywhere
+// a job's card block is mutated; use updateMsg only for non-card messages.
+export async function safeUpdateCard(env: Env, job: JobRow, text: string, blocks: object[]): Promise<void> {
+  if (!job.channel_id || !job.card_ts) return;
+  const r = await slackApi(env, 'chat.update', { channel: job.channel_id, ts: job.card_ts, text, blocks }) as Record<string, unknown>;
+  if (r.ok) return;
+  if (r.error === 'message_not_found' && job.root_ts) {
+    // Card was deleted — re-post it into the thread and record the new ts
+    const newCardTs = await postMsg(env, job.channel_id, text, blocks, job.root_ts);
+    await updateJob(env, job.id, { card_ts: newCardTs });
+  }
+}
+
 export async function deleteMsg(env: Env, channel: string, ts: string): Promise<void> {
   await slackApi(env, 'chat.delete', { channel, ts });
 }

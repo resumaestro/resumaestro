@@ -4,7 +4,7 @@
 import type { Env, JobRow } from '../types';
 import { getJob, updateJob, getCompanyResearchLevel } from '../db';
 import { cardBlocks, deepResearchModal, refineModal, jobDetailModal } from '../blocks';
-import { updateMsg, deleteMsg, openModal, publishHome, wakeAgent, moveThread } from '../slack';
+import { safeUpdateCard, updateMsg, deleteMsg, openModal, publishHome, wakeAgent, moveThread } from '../slack';
 
 export async function handleInteractivity(env: Env, payload: Record<string, unknown>): Promise<void> {
   const userId = (payload.user as Record<string, string>)?.id ?? '';
@@ -27,7 +27,7 @@ export async function handleInteractivity(env: Env, payload: Record<string, unkn
 
       await updateJob(env, jobId, { status: 'researching', research_level: 'deep', research_facets: JSON.stringify({ facets, extra }), queued_next: 'none' });
       const updated = await getJob(env, jobId);
-      await updateMsg(env, job.channel_id, job.card_ts, 'Researching…', cardBlocks(updated!));
+      await safeUpdateCard(env, updated!, 'Researching…', cardBlocks(updated!));
       await wakeAgent(env, 'deep_research', jobId, {
         facets,
         extra,
@@ -44,7 +44,7 @@ export async function handleInteractivity(env: Env, payload: Record<string, unkn
 
       await updateJob(env, jobId, { status: 'tailoring', tailor_state: 'in_progress' });
       const updated = await getJob(env, jobId);
-      await updateMsg(env, job.channel_id, job.card_ts, 'Tailoring…', cardBlocks(updated!));
+      await safeUpdateCard(env, updated!, 'Tailoring…', cardBlocks(updated!));
       await wakeAgent(env, 'refine', jobId, { feedback });
       await publishHome(env, userId);
     }
@@ -71,12 +71,12 @@ export async function handleInteractivity(env: Env, payload: Record<string, unkn
       if (act === 'stage' && env.STAGE_CHANNEL) {
         await updateJob(env, ovJobId, { status: 'staging' });
         const updated = await getJob(env, ovJobId);
-        if (job.channel_id && job.card_ts) await updateMsg(env, job.channel_id, job.card_ts, 'Moving…', cardBlocks(updated!));
+        await safeUpdateCard(env, updated!, 'Moving…', cardBlocks(updated!));
         await moveThread(env, updated!, env.STAGE_CHANNEL);
       } else if (act === 'park' && env.PARKING_LOT_CHANNEL) {
         await updateJob(env, ovJobId, { status: 'parking' });
         const updated = await getJob(env, ovJobId);
-        if (job.channel_id && job.card_ts) await updateMsg(env, job.channel_id, job.card_ts, 'Parking…', cardBlocks(updated!));
+        await safeUpdateCard(env, updated!, 'Parking…', cardBlocks(updated!));
         await moveThread(env, updated!, env.PARKING_LOT_CHANNEL);
       } else if (act === 'delete') {
         if (job.card_ts && job.channel_id) await deleteMsg(env, job.channel_id, job.card_ts).catch(() => {});
@@ -92,14 +92,11 @@ export async function handleInteractivity(env: Env, payload: Record<string, unkn
     const job = await getJob(env, jobId);
     if (!job) return;
 
-    // Resolve card coordinates: prefer container (message context) → fall back to job record
-    const ch = container?.channel_id ?? job.channel_id ?? '';
-    const ct = container?.message_ts ?? job.card_ts ?? '';
-
-    // Helper: update card (if we have message coordinates) and always refresh home
+    // Helper: update card and always refresh home.
+    // safeUpdateCard re-posts the card into the thread if the message was deleted.
     const refresh = async (updated: JobRow | null, text: string) => {
-      if (updated && ch && ct && container?.type !== 'view') {
-        await updateMsg(env, ch, ct, text, cardBlocks(updated));
+      if (updated && container?.type !== 'view') {
+        await safeUpdateCard(env, updated, text, cardBlocks(updated));
       }
       await publishHome(env, userId);
     };
