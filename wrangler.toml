@@ -1,4 +1,4 @@
-name = "job-slack"
+name = "resumaestro-resumaestro"
 main = "src/server.ts"
 compatibility_date = "2025-01-01"
 
