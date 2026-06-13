@@ -13,7 +13,7 @@ bucket_name = "job-source"
 [[d1_databases]]
 binding = "DB"
 database_name = "job-pipeline"
-database_id = "REPLACE_WITH_database_id_FROM_d1_create"
+database_id = "316f5071-ab12-42c4-90e8-18a8f090a016"
 
 # Workers AI — embeddings for the /data gateway.
 [ai]
