@@ -12,7 +12,7 @@
 // Secrets Store REST API (needs CF_API_TOKEN). If write-back is not configured, the
 // new tokens are returned in the response for the caller to persist instead.
 
-import type { Env } from "../index";
+import type { Env } from "../types";
 
 const SLACK_API = "https://slack.com/api";
 const CF_API = "https://api.cloudflare.com/client/v4";
