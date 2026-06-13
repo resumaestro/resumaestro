@@ -1,9 +1,10 @@
 // ---- Cloudflare data gateway (GET|POST /data/*) ---------------------------
-// Bearer-authenticated. Exposes R2, Vectorize, and Workers AI embeddings to
+// Bearer-authenticated. Exposes R2, Vectorize, Workers AI, and D1 to
 // the agent and other internal callers without exposing raw CF credentials.
 
-import type { Env } from '../types';
+import type { Env, JobRow } from '../types';
 import { JSON_H } from '../types';
+import { makeJobId, createJob, getJob, listJobs } from '../db';
 
 export const EMBED_MODEL = '@cf/qwen/qwen3-embedding-0.6b';
 
@@ -34,6 +35,36 @@ async function embedText(env: Env, text: string | string[]): Promise<number[][]>
 export async function handleData(req: Request, env: Env, url: URL): Promise<Response> {
   if (!bearerOk(req, env)) return dj({ error: 'unauthorized' }, 401);
   const p = url.pathname;
+
+  // ---- D1: job record CRUD ------------------------------------------------
+
+  // POST /data/d1/jobs - create (or skip-on-conflict) a job row.
+  if (req.method === 'POST' && p === '/data/d1/jobs') {
+    const b = await req.json().catch(() => ({})) as Partial<JobRow> & { listing_url?: string };
+    if (!b.listing_url) return dj({ error: 'missing listing_url' }, 400);
+    const id = b.id ?? await makeJobId(b.listing_url);
+    await createJob(env, { ...b, id, listing_url: b.listing_url });
+    const inserted = await getJob(env, id);
+    return dj({ ok: true, id, job: inserted });
+  }
+
+  // GET /data/d1/jobs - list jobs (accepts ?filter=active|staged|parked)
+  if (req.method === 'GET' && p === '/data/d1/jobs') {
+    const filter = url.searchParams.get('filter') ?? 'active';
+    const jobs = await listJobs(env, filter);
+    return dj({ jobs, count: jobs.length });
+  }
+
+  // GET /data/d1/jobs/:id - fetch single job
+  if (req.method === 'GET' && p.startsWith('/data/d1/jobs/')) {
+    const id = p.slice('/data/d1/jobs/'.length);
+    if (!id) return dj({ error: 'missing id' }, 400);
+    const job = await getJob(env, id);
+    if (!job) return dj({ error: 'not found' }, 404);
+    return dj({ job });
+  }
+
+  // ---- Embeddings ---------------------------------------------------------
 
   if (req.method === 'POST' && p === '/data/embed') {
     const b = await req.json().catch(() => ({})) as { text?: string | string[] };
