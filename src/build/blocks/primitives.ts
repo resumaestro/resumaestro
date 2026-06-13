@@ -5,6 +5,7 @@ import type {
   PlainTextElement,
   RichTextBlock,
   SectionBlock,
+  SectionBlockAccessory,
 } from '@slack/types';
 
 type CreateButtonOptions = {
@@ -42,9 +43,18 @@ export function createPlainText(text: string): PlainTextElement {
   };
 }
 
-export function createMarkdown(text: string, options: { withSection: true }): SectionBlock;
-export function createMarkdown(text: string, options?: { withSection?: false }): MrkdwnElement;
-export function createMarkdown(text: string, options?: { withSection?: boolean }): MrkdwnElement | SectionBlock {
+export function createMarkdown(
+  text: string,
+  options: { withSection: true; accessory?: SectionBlockAccessory },
+): SectionBlock;
+export function createMarkdown(
+  text: string,
+  options?: { withSection?: false },
+): MrkdwnElement;
+export function createMarkdown(
+  text: string,
+  options?: { withSection?: boolean; accessory?: SectionBlockAccessory },
+): MrkdwnElement | SectionBlock {
   const markdown: MrkdwnElement = {
     type: 'mrkdwn',
     text,
@@ -54,6 +64,7 @@ export function createMarkdown(text: string, options?: { withSection?: boolean }
     return {
       type: 'section',
       text: markdown,
+      accessory: options.accessory,
     };
   }
 
