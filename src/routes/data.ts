@@ -18,9 +18,9 @@ export function bearerOk(request: Request, env: Env): boolean {
 
 function vecIndex(env: Env, name: string): VectorizeIndex | null {
   switch (String(name ?? '').toLowerCase()) {
-    case 'company': case 'job-company': return env.VEC_COMPANY;
-    case 'people': case 'person': case 'job-people': return env.VEC_PEOPLE;
-    case 'role': case 'job-role': return env.VEC_ROLE;
+    case 'company': case 'resumaestro-companies': return env.VEC_COMPANY;
+    case 'people': case 'person': case 'resumaestro-teammembers': return env.VEC_PEOPLE;
+    case 'role': case 'resumaestro-roles': return env.VEC_ROLE;
     case 'code': case 'rag': case 'source-code-rag': return env.VEC_CODE;
     default: return null;
   }
