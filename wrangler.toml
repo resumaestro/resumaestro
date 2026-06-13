@@ -36,12 +36,12 @@ index_name = "source-code-rag"
 # is what the rotated-token write-back REST call uses, since the binding can't read it).
 [[secrets_store_secrets]]
 binding = "SLACK_CONFIG_TOKEN"
-store_id = "<STORE_ID>"
+store_id = "5376e6440f0a470496364c1a036ecac8"
 secret_name = "SLACK_CONFIG_TOKEN"
 
 [[secrets_store_secrets]]
 binding = "SLACK_CONFIG_REFRESH_TOKEN"
-store_id = "<STORE_ID>"
+store_id = "5376e6440f0a470496364c1a036ecac8"
 secret_name = "SLACK_CONFIG_REFRESH_TOKEN"
 
 [vars]
@@ -53,9 +53,9 @@ SLACK_CHANNEL = "C0BA8G3UFNJ"
 AGENT_MENTION = ""
 
 # ---- /admin/update-manifest ----
-SLACK_APP_ID = "<SLACK_APP_ID>"                       # Slack app to update (A...); body.app_id overrides
-CF_ACCOUNT_ID = "281f6b8969eb59a0dec34daaafd69a29"    # for rotated-token write-back
-SECRETS_STORE_ID = "<STORE_ID>"                       # same id as the secrets_store_secrets bindings above
+SLACK_APP_ID = "A0BA7JJ1LKX"
+CF_ACCOUNT_ID = "281f6b8969eb59a0dec34daaafd69a29"
+SECRETS_STORE_ID = "5376e6440f0a470496364c1a036ecac8"
 
 # Secrets (do NOT put in this file):
 #   wrangler secret put SLACK_BOT_TOKEN     # xoxb-... bot token, chat:write to #orchestra
