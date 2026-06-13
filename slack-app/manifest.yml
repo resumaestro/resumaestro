@@ -8,27 +8,27 @@ features:
     always_online: true
   slash_commands:
     - command: /add
-      url: https://job-slack.cameronaziz.workers.dev/slack/commands/add
+      url: https://job-slack.cameronaziz.workers.dev/commands/add
       description: Add Job
       usage_hint: "/add {link}"
       should_escape: false
     - command: /research
-      url: https://job-slack.cameronaziz.workers.dev/slack/commands/research
+      url: https://job-slack.cameronaziz.workers.dev/commands/research
       description: Research Company
       usage_hint: "/research [deep | surface]"
       should_escape: false
     - command: /apply
-      url: https://job-slack.cameronaziz.workers.dev/slack/commands/apply
+      url: https://job-slack.cameronaziz.workers.dev/commands/apply
       description: Prepare application package
       usage_hint: "/apply"
       should_escape: false
     - command: /move
-      url: https://job-slack.cameronaziz.workers.dev/slack/commands/move
+      url: https://job-slack.cameronaziz.workers.dev/commands/move
       description: Stage or park this job
       usage_hint: "/move [park{archive} | stage{apply}]"
       should_escape: false
     - command: /fix
-      url: https://job-slack.cameronaziz.workers.dev/slack/commands/fix
+      url: https://job-slack.cameronaziz.workers.dev/commands/fix
       description: Improve this job
       usage_hint: "/fix [content | layout | (free form)]"
       should_escape: false
