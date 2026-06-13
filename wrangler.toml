@@ -30,6 +30,11 @@ index_name = "job-role"
 binding = "VEC_CODE"
 index_name = "source-code-rag"
 
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+
 # Secrets Store — Slack app *config* tokens, read at runtime via these bindings
 # (read-only: env.SLACK_CONFIG_TOKEN.get()). Create the store + two secrets, then
 # drop the store id into both bindings AND the SECRETS_STORE_ID var below (the var
