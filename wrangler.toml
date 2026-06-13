@@ -20,15 +20,15 @@ binding = "AI"
 # Vectorize — four indices, 1024-dim cosine.
 [[vectorize]]
 binding = "VEC_COMPANY"
-index_name = "job-company"
+index_name = "resumaestro-companies"
 
 [[vectorize]]
 binding = "VEC_PEOPLE"
-index_name = "job-people"
+index_name = "resumaestro-teammembers"
 
 [[vectorize]]
 binding = "VEC_ROLE"
-index_name = "job-role"
+index_name = "resumaestro-roles"
 
 [[vectorize]]
 binding = "VEC_CODE"
