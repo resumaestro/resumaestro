@@ -1,6 +1,7 @@
 // job-slack — interactivity + data plane for the single Conductor agent.
 //
 // Routes:
+//   POST /admin/update-manifest     bearer-auth: push slack-app/manifest.yml to Slack API (token rotation included)
 //   POST /commands/add              slash command: add a job to the pipeline
 //   POST /commands/jobs             slash command: list all pipeline jobs (message)
 //   POST /slack/events              Slack event subscriptions (app_home_opened, app_mention)
@@ -29,7 +30,20 @@ export interface Env {
 
   // Agent
   AGENT_WEBHOOK_URL: string;    // Hyperagent webhook URL for the single Conductor agent
-  AGENT_API_TOKEN: string;      // shared bearer for /data/* AND /jobs/:id/result
+  AGENT_API_TOKEN: string;      // shared bearer for /data/*, /jobs/:id/result, /admin/*
+
+  // Slack config tokens (for apps.manifest.update — different from the bot token)
+  // Obtain via: https://api.slack.com/authentication/config-tokens
+  SLACK_APP_ID: string;                  // e.g. "A0BA7JJ1LKX"
+  SLACK_CONFIG_ACCESS_TOKEN: string;     // xoxe.xoxp-... short-lived access token
+  SLACK_CONFIG_REFRESH_TOKEN: string;    // xoxe-... long-lived refresh token
+
+  // Optional: Cloudflare API token + account/script info for writing rotated tokens
+  // back to Worker secrets so the next rotation finds fresh values automatically.
+  // Without these, new token pairs are returned to CI in `.rotated.new_tokens`.
+  CF_API_TOKEN?: string;
+  CF_ACCOUNT_ID?: string;
+  CF_WORKER_NAME?: string;               // defaults to "job-slack"
 
   // Workers AI + Vectorize (data gateway)
   AI: { run: (model: string, inputs: unknown) => Promise<unknown> };
@@ -982,6 +996,118 @@ async function handleJobResult(env: Env, id: string, body: Record<string, unknow
   return new Response(JSON.stringify({ ok: true }), { headers: { 'Content-Type': 'application/json' } });
 }
 
+// ---- /admin/update-manifest -----------------------------------------------
+//
+// Called by .github/workflows/slack-manifest.yml whenever slack-app/manifest.yml
+// changes on main. The worker owns the Slack config tokens (SLACK_CONFIG_ACCESS_TOKEN
+// + SLACK_CONFIG_REFRESH_TOKEN) so CI never needs them directly.
+//
+// Flow:
+//   1. Try apps.manifest.update with the current access token.
+//   2. If expired (token_expired / invalid_auth), call tooling.tokens.rotate.
+//   3. Retry with the new access token.
+//   4. Attempt to write the new pair back into Worker secrets via the CF API.
+//      • Persisted → rotated.write_back.persisted = true  (CI just logs it).
+//      • Not persisted → returns new tokens in rotated.new_tokens  (CI warns).
+//
+// Response shape (always JSON):
+//   { ok: true }                             success, nothing rotated
+//   { ok: true, rotated: { write_back: { persisted: true } } }
+//   { ok: true, rotated: { write_back: { persisted: false }, new_tokens: { access_token, refresh_token } } }
+//   { ok: false, error: "…" }                failure
+
+interface RotateResult {
+  ok: boolean;
+  access_token?: string;
+  refresh_token?: string;
+  error?: string;
+}
+
+async function slackManifestUpdate(accessToken: string, appId: string, manifest: object): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch('https://slack.com/api/apps.manifest.update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ app_id: appId, manifest }),
+  });
+  const j = await res.json() as { ok: boolean; error?: string };
+  return j;
+}
+
+async function rotateConfigToken(refreshToken: string): Promise<RotateResult> {
+  const res = await fetch('https://slack.com/api/tooling.tokens.rotate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ refresh_token: refreshToken }).toString(),
+  });
+  const j = await res.json() as { ok: boolean; token?: string; refresh_token?: string; error?: string };
+  if (!j.ok) return { ok: false, error: j.error ?? 'rotation_failed' };
+  return { ok: true, access_token: j.token, refresh_token: j.refresh_token };
+}
+
+async function persistRotatedTokens(
+  env: Env, accessToken: string, refreshToken: string,
+): Promise<{ persisted: boolean }> {
+  if (!env.CF_API_TOKEN || !env.CF_ACCOUNT_ID) return { persisted: false };
+  const script = env.CF_WORKER_NAME ?? 'job-slack';
+  const base = `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/workers/scripts/${script}/secrets`;
+  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${env.CF_API_TOKEN}` };
+
+  try {
+    const [r1, r2] = await Promise.all([
+      fetch(base, { method: 'PUT', headers, body: JSON.stringify({ name: 'SLACK_CONFIG_ACCESS_TOKEN', text: accessToken, type: 'secret_text' }) }),
+      fetch(base, { method: 'PUT', headers, body: JSON.stringify({ name: 'SLACK_CONFIG_REFRESH_TOKEN', text: refreshToken, type: 'secret_text' }) }),
+    ]);
+    const [j1, j2] = await Promise.all([r1.json(), r2.json()]) as [{ success: boolean }, { success: boolean }];
+    return { persisted: j1.success && j2.success };
+  } catch {
+    return { persisted: false };
+  }
+}
+
+async function handleUpdateManifest(env: Env, req: Request): Promise<Response> {
+  if (!bearerOk(req, env)) return dj({ ok: false, error: 'unauthorized' }, 401);
+
+  const body = await req.json().catch(() => null) as { manifest?: object } | null;
+  if (!body?.manifest) return dj({ ok: false, error: 'missing manifest object in body' }, 400);
+
+  const appId = env.SLACK_APP_ID;
+  const accessToken = env.SLACK_CONFIG_ACCESS_TOKEN;
+  const refreshToken = env.SLACK_CONFIG_REFRESH_TOKEN;
+
+  if (!appId) return dj({ ok: false, error: 'SLACK_APP_ID not configured on worker' }, 500);
+  if (!accessToken) return dj({ ok: false, error: 'SLACK_CONFIG_ACCESS_TOKEN not configured on worker' }, 500);
+
+  // 1. First attempt
+  const first = await slackManifestUpdate(accessToken, appId, body.manifest);
+  if (first.ok) return dj({ ok: true });
+
+  // 2. Expired — rotate and retry
+  const expiredErrors = new Set(['token_expired', 'invalid_auth', 'token_revoked']);
+  if (!expiredErrors.has(first.error ?? '') || !refreshToken) {
+    return dj({ ok: false, error: first.error ?? 'manifest_update_failed' }, 502);
+  }
+
+  const rotation = await rotateConfigToken(refreshToken);
+  if (!rotation.ok || !rotation.access_token || !rotation.refresh_token) {
+    return dj({ ok: false, error: `token rotation failed: ${rotation.error}` }, 502);
+  }
+
+  // 3. Retry with fresh token
+  const second = await slackManifestUpdate(rotation.access_token, appId, body.manifest);
+
+  // 4. Write new tokens back to Worker secrets (best-effort)
+  const writeBack = await persistRotatedTokens(env, rotation.access_token, rotation.refresh_token);
+
+  const rotated = {
+    write_back: writeBack,
+    // Only surface raw tokens when we couldn't persist them — CI warns and handles them
+    ...(!writeBack.persisted && { new_tokens: { access_token: rotation.access_token, refresh_token: rotation.refresh_token } }),
+  };
+
+  if (!second.ok) return dj({ ok: false, error: second.error ?? 'manifest_update_failed_after_rotation', rotated }, 502);
+  return dj({ ok: true, rotated });
+}
+
 // ---- Data gateway (unchanged) --------------------------------------------
 
 const JSON_H = { 'Content-Type': 'application/json' };
@@ -1163,6 +1289,11 @@ export default {
 
     // Data gateway — bearer-auth, no Slack sig needed
     if (p === '/data' || p.startsWith('/data/')) return handleData(req, env, url);
+
+    // Manifest update — bearer-auth, called by CI; no Slack sig needed
+    if (req.method === 'POST' && p === '/admin/update-manifest') {
+      return handleUpdateManifest(env, req);
+    }
 
     // Agent result callback — bearer-auth
     const resultMatch = p.match(/^\/jobs\/([^/]+)\/result$/);
