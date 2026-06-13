@@ -6,8 +6,13 @@ features:
   bot_user:
     display_name: conductor
     always_online: true
+  # App Home tab: shows all pipeline jobs; buttons and View modal work from here.
+  app_home:
+    home_tab_enabled: true
+    messages_tab_enabled: false
+    messages_tab_read_only_enabled: false
   slash_commands:
-    # Slimmed: research / apply / move / fix are now buttons on the job card.
+    # Slimmed: research / apply / move / fix are now buttons on the job card and App Home.
     - command: /add
       url: https://job-slack.cameronaziz.workers.dev/commands/add
       description: Add a job to the pipeline
@@ -15,7 +20,7 @@ features:
       should_escape: false
     - command: /jobs
       url: https://job-slack.cameronaziz.workers.dev/commands/jobs
-      description: List the jobs in the pipeline
+      description: List all pipeline jobs
       usage_hint: "[active | staged | parked]"
       should_escape: false
 oauth_config:
@@ -40,7 +45,7 @@ oauth_config:
       - users:read.email
       - files:read
     bot:
-      - commands              # required for any slash command
+      - commands              # required for slash commands
       - chat:write
       - chat:write.customize
       - channels:history
@@ -54,20 +59,20 @@ oauth_config:
       - links:read
       - links:write
       - reactions:write
-      - files:write          # NEW: attach the brief + resume PDF in-thread (retires the Slack File Upload skill)
+      - files:write           # attach brief + resume PDF in-thread (retires Slack File Upload skill)
   pkce_enabled: false
 settings:
   interactivity:
     is_enabled: true
-    # NEW: buttons + modals (block_actions / view_submission) post here.
+    # Buttons + modals (block_actions / view_submission) post here.
     request_url: https://job-slack.cameronaziz.workers.dev/slack/interactivity
   event_subscriptions:
-    request_url: https://hyperagent.com/api/slack/events/09cf31d3-5e72-429b-be21-41ba2a2ce090
+    # Worker handles app_home_opened directly (pure data render, no AI needed).
+    # app_mention is forwarded to AGENT_WEBHOOK_URL to wake the Conductor agent.
+    request_url: https://job-slack.cameronaziz.workers.dev/slack/events
     bot_events:
-      # Dropped message.channels/groups/im: no passive listening. The agent only
-      # runs on explicit slash commands (via the worker) and direct @mentions.
-      - app_mention
-      - link_shared
+      - app_home_opened       # NEW: render the pipeline home view
+      - app_mention           # wake the Conductor agent
   org_deploy_enabled: false
   socket_mode_enabled: false
   token_rotation_enabled: false
