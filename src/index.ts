@@ -544,6 +544,19 @@ async function updateMsg(env: Env, channel: string, ts: string, text: string, bl
   await slackApi(env, 'chat.update', { channel, ts, text, blocks });
 }
 
+// updateMsg that recovers from deleted messages: if the card is gone, re-posts it
+// in the same thread and updates the D1 record with the new ts.
+async function safeUpdateCard(env: Env, job: JobRow, text: string, blocks: object[]): Promise<void> {
+  if (!job.channel_id || !job.card_ts) return;
+  const r = await slackApi(env, 'chat.update', { channel: job.channel_id, ts: job.card_ts, text, blocks });
+  if (r.ok) return;
+  if (r.error === 'message_not_found' && job.root_ts) {
+    // Card was deleted — re-post it into the thread and update D1
+    const newCardTs = await postMsg(env, job.channel_id, text, blocks, job.root_ts);
+    await updateJob(env, job.id, { card_ts: newCardTs });
+  }
+}
+
 async function deleteMsg(env: Env, channel: string, ts: string): Promise<void> {
   await slackApi(env, 'chat.delete', { channel, ts });
 }
@@ -665,18 +678,40 @@ async function handleAddCommand(env: Env, payload: Record<string, string>): Prom
   const channel = env.SLACK_CHANNEL;
   const ownerId = payload.user_id ?? null;
 
-  // Dedup — link to the existing thread if this URL was already added
+  // Dedup — check whether the URL is already in the pipeline.
   const existing = await env.DB.prepare('SELECT * FROM jobs WHERE listing_url = ?').bind(url).first<JobRow>();
   if (existing) {
+    // Probe whether the Slack card still exists.
+    const cardAlive = existing.card_ts && existing.channel_id
+      ? (await slackApi(env, 'chat.getPermalink', { channel: existing.channel_id, message_ts: existing.card_ts })).ok === true
+      : false;
+
+    if (!cardAlive) {
+      // Messages were deleted — re-post a fresh thread and restart the scan.
+      const newRootTs = await postMsg(env, channel, url);
+      const freshJob = { ...existing, root_ts: newRootTs, card_ts: null, status: 'scoring' } as JobRow;
+      const newCardTs = await postMsg(env, channel, 'Scanning…', cardBlocks(freshJob), newRootTs);
+      await updateJob(env, existing.id, { root_ts: newRootTs, card_ts: newCardTs, status: 'scoring', channel_id: channel, owner_id: ownerId ?? existing.owner_id });
+      await wakeAgent(env, 'surface_scan', existing.id, { listing_url: url });
+      await fetch(payload.response_url, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ response_type: 'ephemeral', text: 'Thread was gone — restarted scan.' }),
+      });
+      return;
+    }
+
+    // Thread is alive — show its current status.
+    const tsSafe = existing.root_ts?.replace('.', '') ?? '';
+    const threadLink = tsSafe
+      ? `<slack://channel?team=${payload.team_id}&id=${existing.channel_id ?? channel}&message=${tsSafe}|open thread>`
+      : '';
+    const isStuck = existing.status === 'scoring';
+    const statusLine = isStuck
+      ? `Still scanning${threadLink ? ` — ${threadLink}` : ''}. Delete the thread and re-add to restart.`
+      : `Already in pipeline *(${existing.status})*${threadLink ? ` — ${threadLink}` : ''}.`;
     await fetch(payload.response_url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        response_type: 'ephemeral',
-        text: existing.root_ts
-          ? `Already in pipeline — <slack://channel?team=${payload.team_id}&id=${channel}&message=${existing.root_ts}|open thread>`
-          : 'Already in pipeline.',
-      }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ response_type: 'ephemeral', text: statusLine }),
     });
     return;
   }
@@ -702,6 +737,14 @@ async function handleAddCommand(env: Env, payload: Record<string, string>): Prom
   // 4. Persist Slack coordinates + wake agent
   await updateJob(env, id, { root_ts: rootTs, card_ts: cardTs });
   await wakeAgent(env, 'surface_scan', id, { listing_url: url });
+
+  // Warn (ephemeral, best-effort) if the agent webhook isn't wired up yet.
+  if (!env.AGENT_WEBHOOK_URL) {
+    await fetch(payload.response_url, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ response_type: 'ephemeral', text: '⚠️ `AGENT_WEBHOOK_URL` is not set — job added but the scan will not start until it is configured in `wrangler.toml`.' }),
+    });
+  }
 
   // 5. Refresh the owner's App Home
   if (ownerId) await publishHome(env, ownerId);
@@ -757,7 +800,7 @@ async function handleInteractivity(env: Env, payload: Record<string, unknown>): 
 
       await updateJob(env, jobId, { status: 'researching', research_level: 'deep', research_facets: JSON.stringify({ facets, extra }), queued_next: 'none' });
       const updated = await getJob(env, jobId);
-      await updateMsg(env, job.channel_id, job.card_ts, 'Researching…', cardBlocks(updated!));
+      await safeUpdateCard(env, updated!, 'Researching…', cardBlocks(updated!));
       await wakeAgent(env, 'deep_research', jobId, { facets, extra });
       await publishHome(env, userId);
     }
@@ -769,7 +812,7 @@ async function handleInteractivity(env: Env, payload: Record<string, unknown>): 
 
       await updateJob(env, jobId, { status: 'tailoring', tailor_state: 'in_progress' });
       const updated = await getJob(env, jobId);
-      await updateMsg(env, job.channel_id, job.card_ts, 'Tailoring…', cardBlocks(updated!));
+      await safeUpdateCard(env, updated!, 'Tailoring…', cardBlocks(updated!));
       await wakeAgent(env, 'refine', jobId, { feedback });
       await publishHome(env, userId);
     }
@@ -821,10 +864,10 @@ async function handleInteractivity(env: Env, payload: Record<string, unknown>): 
     const ch = container?.channel_id ?? job.channel_id ?? '';
     const ct = container?.message_ts ?? job.card_ts ?? '';
 
-    // Helper: update card (if we have message coordinates) and always refresh home
+    // Helper: update card (recovers from deleted messages) and always refresh home
     const refresh = async (updated: JobRow | null, text: string) => {
-      if (updated && ch && ct && container?.type !== 'view') {
-        await updateMsg(env, ch, ct, text, cardBlocks(updated));
+      if (updated && container?.type !== 'view') {
+        await safeUpdateCard(env, updated, text, cardBlocks(updated));
       }
       await publishHome(env, userId);
     };
@@ -939,7 +982,7 @@ async function handleJobResult(env: Env, id: string, body: Record<string, unknow
       status: 'scored',
     });
     const updated = await getJob(env, id);
-    await updateMsg(env, ch, ct, `${updated!.company ?? ''} — ${updated!.role ?? ''}`, cardBlocks(updated!));
+    await safeUpdateCard(env, updated!, `${updated!.company ?? ''} — ${updated!.role ?? ''}`, cardBlocks(updated!));
     await homeRefresh();
   }
 
@@ -952,7 +995,7 @@ async function handleJobResult(env: Env, id: string, body: Record<string, unknow
       queued_next: 'none',
     });
     const updated = await getJob(env, id);
-    await updateMsg(env, ch, ct, 'Research complete', cardBlocks(updated!));
+    await safeUpdateCard(env, updated!, 'Research complete', cardBlocks(updated!));
 
     if (body.brief_key && rootTs) {
       await uploadToThread(env, body.brief_key as string, ch, rootTs, 'Research Brief', (body.summary as string) || 'Research complete.');
@@ -973,7 +1016,7 @@ async function handleJobResult(env: Env, id: string, body: Record<string, unknow
       queued_next: 'none',
     });
     const updated = await getJob(env, id);
-    await updateMsg(env, ch, ct, 'Tailoring complete', cardBlocks(updated!));
+    await safeUpdateCard(env, updated!, 'Tailoring complete', cardBlocks(updated!));
 
     if (body.resume_pdf_key && rootTs) {
       await uploadToThread(env, body.resume_pdf_key as string, ch, rootTs, 'Tailored Resume', (body.decisions as string) || 'Tailoring complete.');
@@ -983,7 +1026,7 @@ async function handleJobResult(env: Env, id: string, body: Record<string, unknow
       const stageJob = await getJob(env, id);
       if (stageJob) {
         await updateJob(env, id, { status: 'staging' });
-        await updateMsg(env, ch, ct, 'Staging…', cardBlocks({ ...stageJob, status: 'staging' } as JobRow));
+        await safeUpdateCard(env, { ...stageJob, status: 'staging' } as JobRow, 'Staging…', cardBlocks({ ...stageJob, status: 'staging' } as JobRow));
         await moveThread(env, stageJob, env.STAGE_CHANNEL);
       }
     }
