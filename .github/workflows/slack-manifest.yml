@@ -1,0 +1,56 @@
+name: Push Slack manifest
+
+# When slack-app/manifest.yml changes on main, push it to Slack through the worker's
+# /admin/update-manifest endpoint. The worker holds the Slack *config* tokens (in
+# Cloudflare Secrets Store) and rotates/persists them itself, so this job only needs
+# the bearer (AGENT_API_TOKEN) and the worker URL — no Slack or Cloudflare token here.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "slack-app/manifest.yml"
+  workflow_dispatch: {} # lets you push the current manifest manually (e.g. the first time)
+
+permissions:
+  contents: read
+
+concurrency:
+  group: slack-manifest
+  cancel-in-progress: false
+
+jobs:
+  push-manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # yq + jq are preinstalled on ubuntu-latest. Convert the YAML manifest to JSON
+      # and wrap it as { "manifest": <object> }. The worker fills app_id from its
+      # SLACK_APP_ID var (pass "app_id" here too if you'd rather set it per-call).
+      - name: Build request body
+        run: |
+          yq -o=json -I=0 '{"manifest": .}' slack-app/manifest.yml > body.json
+
+      - name: POST to /admin/update-manifest
+        env:
+          JOB_SLACK_URL: ${{ vars.JOB_SLACK_URL }}
+          AGENT_API_TOKEN: ${{ secrets.AGENT_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          code=$(curl -sS -o resp.json -w '%{http_code}' \
+            -X POST "$JOB_SLACK_URL/admin/update-manifest" \
+            -H "Authorization: Bearer $AGENT_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @body.json || echo "000")
+          echo "HTTP $code"; cat resp.json 2>/dev/null; echo
+          if [ "$code" != "200" ] || [ "$(jq -r '.ok // false' resp.json)" != "true" ]; then
+            echo "::error::manifest update failed (HTTP $code)"
+            exit 1
+          fi
+          if jq -e '.rotated != null' resp.json >/dev/null 2>&1; then
+            echo "config token rotated; write_back persisted=$(jq -r '.rotated.write_back.persisted' resp.json)"
+          fi
+          if jq -e '.rotated.new_tokens' resp.json >/dev/null 2>&1; then
+            echo "::warning::worker returned a new token pair (in-worker write-back not configured). Set CF_API_TOKEN on the worker, or persist these to the store."
+          fi
