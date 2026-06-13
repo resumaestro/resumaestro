@@ -1,5 +1,3 @@
-import { handleAdmin } from './routes/admin';
-
 // job-slack — interactivity + data plane for the single Conductor agent.
 //
 // Routes:
@@ -18,6 +16,7 @@ import { handleAdmin } from './routes/admin';
 import type { Env, ApplyAction } from './types';
 import { JSON_H } from './types';
 import { verifySlack } from './slack';
+import { handleAdmin } from './routes/admin';
 import { handleAddCommand, handleJobsCommand } from './routes/commands';
 import { handleSlackEvent } from './routes/events';
 import { handleInteractivity } from './routes/interactivity';
