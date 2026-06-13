@@ -1,0 +1,46 @@
+name: Migrate D1 (PR dry-run)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "config.json"
+      - "migrations/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    environment: sandbox-lock
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run migration dry-run
+        id: migrate
+        uses: resumaestro/pit-boss/actions/d1-migrate@main
+        with:
+          db_name: job-pipeline
+          sandbox_db_name: resumaestro-pipeline-sandbox
+          cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare_account_id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Comment result on PR
+        if: always() && steps.migrate.outputs.needed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${{ steps.migrate.outputs.passed }}" == "true" ]]; then
+            BODY="✅ Migration dry-run passed. Migrations ${{ steps.migrate.outputs.actual }} → ${{ steps.migrate.outputs.target }} roundtrip-tested successfully on sandbox."
+          else
+            BODY="❌ Migration dry-run failed. Migrations ${{ steps.migrate.outputs.actual }} → ${{ steps.migrate.outputs.target }} did not pass the roundtrip test on sandbox. Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details."
+          fi
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --repo resumaestro/resumaestro \
+            --body "$BODY"
+
+      - name: Fail if dry-run did not pass
+        if: steps.migrate.outputs.needed == 'true' && steps.migrate.outputs.passed == 'false'
+        run: exit 1

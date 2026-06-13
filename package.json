@@ -1,5 +1,5 @@
 {
-  "name": "job-slack",
+  "name": "@resumaestro/resumaestro",
   "version": "1.0.0",
   "private": true,
   "description": "Interactivity + input plane for the Job Application Apply agent",
