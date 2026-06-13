@@ -7,13 +7,19 @@ compatibility_date = "2025-01-01"
 binding = "JOB_SOURCE"
 bucket_name = "job-source"
 
-# Workers AI — embeddings for the /data gateway. Replaces the embed calls that
-# used to go through the Composio mcp-cloudflare integration.
+# D1: the queryable job-pipeline record (companies + jobs). One-time setup:
+#   npx wrangler d1 create job-pipeline          # paste the returned database_id below
+#   npx wrangler d1 execute job-pipeline --file=./schema.sql
+[[d1_databases]]
+binding = "DB"
+database_name = "job-pipeline"
+database_id = "REPLACE_WITH_database_id_FROM_d1_create"
+
+# Workers AI — embeddings for the /data gateway.
 [ai]
 binding = "AI"
 
 # Vectorize — the four indices the job-application system queries and upserts.
-# All are 1024-dim, cosine. The /data gateway maps friendly names to these bindings.
 [[vectorize]]
 binding = "VEC_COMPANY"
 index_name = "job-company"
@@ -30,41 +36,13 @@ index_name = "job-role"
 binding = "VEC_CODE"
 index_name = "source-code-rag"
 
-
-[observability.logs]
-enabled = true
-invocation_logs = true
-
-# Secrets Store — Slack app *config* tokens, read at runtime via these bindings
-# (read-only: env.SLACK_CONFIG_TOKEN.get()). Create the store + two secrets, then
-# drop the store id into both bindings AND the SECRETS_STORE_ID var below (the var
-# is what the rotated-token write-back REST call uses, since the binding can't read it).
-[[secrets_store_secrets]]
-binding = "SLACK_CONFIG_TOKEN"
-store_id = "5376e6440f0a470496364c1a036ecac8"
-secret_name = "SLACK_CONFIG_TOKEN"
-
-[[secrets_store_secrets]]
-binding = "SLACK_CONFIG_REFRESH_TOKEN"
-store_id = "5376e6440f0a470496364c1a036ecac8"
-secret_name = "SLACK_CONFIG_REFRESH_TOKEN"
-
 [vars]
-# #orchestra channel id (where the worker drops the control line that wakes the agent)
-SLACK_CHANNEL = "C0BA8G3UFNJ"
-# Optional: the agent's Slack handle, e.g. "<@U0123ABCD>". Set this if #orchestra's
-# trigger mode is "mentions only" so the worker's control line force-triggers the agent.
-# Leave blank if the channel trigger mode is "always respond".
-AGENT_MENTION = ""
-
-# ---- /admin/update-manifest ----
-SLACK_APP_ID = "A0BA7JJ1LKX"
-CF_ACCOUNT_ID = "281f6b8969eb59a0dec34daaafd69a29"
-SECRETS_STORE_ID = "5376e6440f0a470496364c1a036ecac8"
+SLACK_CHANNEL = "C0BA8G3UFNJ"   # #orchestra — where /add posts the root + card
+STAGE_CHANNEL = ""              # #orchestra-stage channel id (recreate target for [Stage])
+PARKING_LOT_CHANNEL = ""        # #orchestra-parking-lot channel id (recreate target for [Park])
+AGENT_WEBHOOK_URL = ""          # Hyperagent webhook invocation URL for the single agent
 
 # Secrets (do NOT put in this file):
-#   wrangler secret put SLACK_BOT_TOKEN     # xoxb-... bot token, chat:write to #orchestra
-#   wrangler secret put AGENT_API_TOKEN     # bearer token the skills present to /data/* and /admin/*
-#   wrangler secret put CF_API_TOKEN        # CF API token w/ Secrets Store Edit — writes rotated Slack
-#                                           # config tokens back to the store. Optional: if unset,
-#                                           # /admin/update-manifest returns the new pair in its response.
+#   wrangler secret put SLACK_BOT_TOKEN       # xoxb-... chat:write + files:write to #orchestra
+#   wrangler secret put SLACK_SIGNING_SECRET  # verify slash-command + interactivity payloads
+#   wrangler secret put AGENT_API_TOKEN       # bearer for /data/* AND the agent -> worker /jobs/:id/result callback
