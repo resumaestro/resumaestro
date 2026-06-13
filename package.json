@@ -1,0 +1,14 @@
+{
+  "name": "job-slack",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interactivity + input plane for the Job Application Apply agent",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250109.0",
+    "wrangler": "^3.99.0"
+  }
+}

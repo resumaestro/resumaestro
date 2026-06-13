@@ -1,0 +1,20 @@
+name = "job-slack"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# R2: the agent and the worker share the same bucket as the source of truth.
+[[r2_buckets]]
+binding = "JOB_SOURCE"
+bucket_name = "job-source"
+
+[vars]
+# #orchestra channel id (where the worker drops the control line that wakes the agent)
+SLACK_CHANNEL = "C0BA8G3UFNJ"
+# Optional: the agent's Slack handle, e.g. "<@U0123ABCD>". Set this if #orchestra's
+# trigger mode is "mentions only" so the worker's control line force-triggers the agent.
+# Leave blank if the channel trigger mode is "always respond".
+AGENT_MENTION = ""
+
+# Secret (do NOT put in this file):
+#   wrangler secret put SLACK_BOT_TOKEN
+# A bot token (xoxb-...) for the same Slack app, with chat:write to #orchestra.
