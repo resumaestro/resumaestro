@@ -6,22 +6,15 @@ features:
   bot_user:
     display_name: conductor
     always_online: true
-  # App Home tab: shows all pipeline jobs; buttons and View modal work from here.
   app_home:
     home_tab_enabled: true
     messages_tab_enabled: false
     messages_tab_read_only_enabled: false
   slash_commands:
-    # Slimmed: research / apply / move / fix are now buttons on the job card and App Home.
-    - command: /add
+    - command: /add-job
       url: https://job-slack.cameronaziz.workers.dev/commands/add
       description: Add a job to the pipeline
       usage_hint: "{link}"
-      should_escape: false
-    - command: /jobs
-      url: https://job-slack.cameronaziz.workers.dev/commands/jobs
-      description: List all pipeline jobs
-      usage_hint: "[active | staged | parked]"
       should_escape: false
 oauth_config:
   redirect_urls:
