@@ -1,0 +1,83 @@
+display_information:
+  name: Conductor
+  description: Job Application Bot
+  background_color: "#004492"
+features:
+  bot_user:
+    display_name: conductor
+    always_online: true
+  slash_commands:
+    - command: /add
+      url: https://job-slack.cameronaziz.workers.dev/slack/commands/add
+      description: Add Job
+      usage_hint: "/add {link}"
+      should_escape: false
+    - command: /research
+      url: https://job-slack.cameronaziz.workers.dev/slack/commands/research
+      description: Research Company
+      usage_hint: "/research [deep | surface]"
+      should_escape: false
+    - command: /apply
+      url: https://job-slack.cameronaziz.workers.dev/slack/commands/apply
+      description: Prepare application package
+      usage_hint: "/apply"
+      should_escape: false
+    - command: /move
+      url: https://job-slack.cameronaziz.workers.dev/slack/commands/move
+      description: Stage or park this job
+      usage_hint: "/move [park{archive} | stage{apply}]"
+      should_escape: false
+    - command: /fix
+      url: https://job-slack.cameronaziz.workers.dev/slack/commands/fix
+      description: Improve this job
+      usage_hint: "/fix [content | layout | (free form)]"
+      should_escape: false
+oauth_config:
+  redirect_urls:
+    - https://hyperagent.com/api/slack/oauth/callback
+  scopes:
+    user:
+      - channels:history
+      - channels:read
+      - channels:write.invites
+      - groups:history
+      - groups:read
+      - groups:write.invites
+      - im:history
+      - im:read
+      - mpim:history
+      - mpim:read
+      - reactions:read
+      - search:read
+      - team:read
+      - users:read
+      - users:read.email
+      - files:read
+    bot:
+      - chat:write
+      - channels:history
+      - channels:read
+      - channels:join
+      - groups:read
+      - groups:history
+      - app_mentions:read
+      - im:history
+      - im:write
+      - links:read
+      - links:write
+      - reactions:write
+      - chat:write.customize
+  pkce_enabled: false
+settings:
+  event_subscriptions:
+    request_url: https://hyperagent.com/api/slack/events/09cf31d3-5e72-429b-be21-41ba2a2ce090
+    bot_events:
+      - app_mention
+      - link_shared
+      - message.channels
+      - message.groups
+      - message.im
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
+  is_mcp_enabled: false
