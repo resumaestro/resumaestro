@@ -1,0 +1,35 @@
+# Syntax preferences
+
+## Naming
+- All functions are verbs: `createCard`, `createFooterBlocks`, `createField`
+- No abbreviations: `button` not `b`, `scores` not `s`, `researchFacets` not `f`
+- Options objects for optional params: `createButton(text, actionId, value, { style: 'primary' })`
+
+## Types
+- Use `@slack/types` for all Slack Block Kit types — never `object` or `object[]`
+- Extract inline types to named types: `type ScoreCandidate = [string, string | undefined]`
+- Function overloads over conditional return types when the return differs by argument shape
+
+## Arrays
+- Use `.at(n)` for index access — never `[n]`
+
+## Style
+- No one-liner `if` bodies — always use braces
+- No inline type assertions in array literals — extract to a named variable first
+- `satisfies` for inline object literals that must match a known type
+- No trailing semicolons on type declarations (`type Foo = { ... }` not `};`)
+
+## Exports
+- No re-exports of types from other modules — import directly from the source
+
+## Responses
+- Use `createResponseInit('json' | 'html', status?)` from `#/headers` for all `new Response(body, ...)` calls — never inline `{ headers: JSON_H }` or `{ headers: HTML_H }`
+- Plain-text error responses with no content-type (e.g. `new Response('not found', { status: 404 })`) are fine as-is
+
+## File structure
+- `src/build/blocks/primitives.ts` — atomic Block Kit builders
+- `src/build/blocks/components.ts` — reusable compositions
+- `src/build/create*.ts` — one file per view/surface, named exports only, no barrel index
+- `src/handlers/html.ts` — `escapeHtml`, `createPage`, `createConfirmPage`, `createEditPage`
+- `src/headers.ts` — `createResponseInit`, `headers.json`, `headers.html`
+- If a helper is only used in one view file, it lives in that file

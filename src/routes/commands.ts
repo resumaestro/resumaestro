@@ -1,9 +1,11 @@
 // ---- Slash command handlers: /add, /jobs ----------------------------------
 
-import type { Env, JobRow } from '../types';
-import { makeJobId, createJob, updateJob, listJobs } from '../db';
-import { cardBlocks, jobsListBlocks } from '../blocks';
-import { postMsg, wakeAgent, publishHome } from '../slack';
+import type { Env, JobRow } from '#/types';
+import { verifySlack } from '#/slack';
+import { makeJobId, createJob, updateJob, listJobs } from '#/db';
+import { createCard } from '#/build/createCard';
+import { createJobsList } from '#/build/createJobsList';
+import { postMsg, wakeAgent, publishHome } from '#/slack';
 
 // ---- /commands/add --------------------------------------------------------
 //
@@ -64,7 +66,7 @@ export async function handleAddCommand(env: Env, payload: Record<string, string>
       html_key: null, brief_key: null, resume_pdf_key: null,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     };
-    const cardTs = await postMsg(env, channel, 'Scanning…', cardBlocks(scanningJob), rootTs);
+    const cardTs = await postMsg(env, channel, 'Scanning…', createCard(scanningJob), rootTs);
 
     // 4. Persist Slack coordinates + wake agent
     await updateJob(env, id, { root_ts: rootTs, card_ts: cardTs });
@@ -75,11 +77,39 @@ export async function handleAddCommand(env: Env, payload: Record<string, string>
   if (ownerId) await publishHome(env, ownerId);
 }
 
+// ---- HTTP route handler (/commands/*) -------------------------------------
+
+export async function handleCommandsRoute(request: Request, env: Env, executionContext: ExecutionContext): Promise<Response> {
+  const command = new URL(request.url).pathname.split('/').filter(Boolean).at(1);
+  const rawBody = await request.text();
+  if (env.SLACK_SIGNING_SECRET) {
+    const valid = await verifySlack(env, rawBody, request);
+    if (!valid) {
+      return new Response('Forbidden', { status: 403 });
+    }
+  }
+
+  if (request.method !== 'POST') {
+    return new Response('method not allowed', { status: 405 });
+  }
+
+  const payload = Object.fromEntries(new URLSearchParams(rawBody));
+  if (command === 'add') {
+    executionContext.waitUntil(handleAddCommand(env, payload));
+    return new Response('', { status: 200 });
+  }
+  if (command === 'jobs') {
+    executionContext.waitUntil(handleJobsCommand(env, payload));
+    return new Response('', { status: 200 });
+  }
+  return new Response('Unknown command', { status: 404 });
+}
+
 // ---- /commands/jobs --------------------------------------------------------
 
 export async function handleJobsCommand(env: Env, payload: Record<string, string>): Promise<void> {
   const filter = (payload.text ?? '').trim().toLowerCase() || 'active';
   const jobs = await listJobs(env, filter);
-  const blocks = jobsListBlocks(jobs, filter);
+  const blocks = createJobsList(jobs, filter);
   await postMsg(env, payload.channel_id, `Pipeline — ${jobs.length} jobs`, blocks);
 }

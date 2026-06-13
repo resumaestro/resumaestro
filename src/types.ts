@@ -8,14 +8,14 @@ export interface Env {
   // Slack
   SLACK_BOT_TOKEN: string;
   SLACK_SIGNING_SECRET: string;
-  SLACK_CHANNEL: string;        // #orchestra  (C0BA8G3UFNJ)
-  STAGE_CHANNEL: string;        // #orchestra-stage
-  PARKING_LOT_CHANNEL: string;  // #orchestra-parking-lot
-  AGENT_MENTION?: string;       // "<@U...>" if channel is mentions-only
+  SLACK_CHANNEL: string; // #orchestra  (C0BA8G3UFNJ)
+  STAGE_CHANNEL: string; // #orchestra-stage
+  PARKING_LOT_CHANNEL: string; // #orchestra-parking-lot
+  AGENT_MENTION?: string; // "<@U...>" if channel is mentions-only
 
   // Agent
-  AGENT_WEBHOOK_URL: string;    // Hyperagent webhook URL for the single Conductor agent
-  AGENT_API_TOKEN: string;      // shared bearer for /data/*, /jobs/:id/result, /admin/*
+  AGENT_WEBHOOK_URL: string; // Hyperagent webhook URL for the single Conductor agent
+  AGENT_API_TOKEN: string; // shared bearer for /data/*, /jobs/:id/result, /admin/*
 
   // Slack config tokens — Secrets Store bindings (read via .get())
   SLACK_APP_ID: string;
@@ -36,7 +36,7 @@ export interface Env {
 export interface JobRow {
   id: string;
   listing_url: string;
-  company_id: string | null;    // FK → companies.id (populated after surface_scan)
+  company_id: string | null; // FK → companies.id (populated after surface_scan)
   company: string | null;
   role: string | null;
   location: string | null;
@@ -48,7 +48,7 @@ export interface JobRow {
   research_facets: string | null;
   tailor_state: string;
   queued_next: string;
-  owner_id: string | null;      // Slack user_id of whoever ran /add (for App Home refresh)
+  owner_id: string | null; // Slack user_id of whoever ran /add (for App Home refresh)
   channel_id: string | null;
   root_ts: string | null;
   card_ts: string | null;
@@ -61,5 +61,7 @@ export interface JobRow {
 
 export type ApplyAction = 'apply_requested' | 'edit_updated' | 'input_provided';
 
-export const JSON_H = { 'Content-Type': 'application/json' } as const;
-export const HTML_H = { 'Content-Type': 'text/html; charset=utf-8' } as const;
+export type ResearchFacets = {
+  facets?: string[];
+  extra?: string;
+};

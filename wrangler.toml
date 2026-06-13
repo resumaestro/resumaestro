@@ -1,5 +1,5 @@
 name = "job-slack"
-main = "src/index.ts"
+main = "src/server.ts"
 compatibility_date = "2025-01-01"
 
 # R2: shared source-of-truth bucket.

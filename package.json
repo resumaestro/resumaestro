@@ -10,5 +10,8 @@
   "devDependencies": {
     "@cloudflare/workers-types": "latest",
     "wrangler": "latest"
+  },
+  "dependencies": {
+    "@slack/types": "^2.21.1"
   }
 }

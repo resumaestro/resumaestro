@@ -2,7 +2,8 @@
 
 import type { Env, JobRow } from './types';
 import { updateJob, listJobs } from './db';
-import { cardBlocks, homeBlocks } from './blocks';
+import { createCard } from './build/createCard';
+import { createHome } from './build/createHome';
 
 // ---- Signature verification -----------------------------------------------
 
@@ -63,7 +64,7 @@ export async function publishHome(env: Env, userId: string): Promise<void> {
   const jobs = await listJobs(env, 'active');
   await slackApi(env, 'views.publish', {
     user_id: userId,
-    view: { type: 'home', blocks: homeBlocks(jobs) },
+    view: { type: 'home', blocks: createHome(jobs) },
   });
 }
 
@@ -132,7 +133,7 @@ export async function moveThread(env: Env, job: JobRow, destChannel: string): Pr
   // Post root + card to destination
   const newRootTs = await postMsg(env, destChannel, rootText);
   const movedJob = { ...job, channel_id: destChannel, root_ts: newRootTs } as JobRow;
-  const newCardTs = await postMsg(env, destChannel, `${job.company ?? ''} — ${job.role ?? ''}`, cardBlocks(movedJob), newRootTs);
+  const newCardTs = await postMsg(env, destChannel, `${job.company ?? ''} — ${job.role ?? ''}`, createCard(movedJob), newRootTs);
 
   // Re-upload brief + resume if stored in R2
   if (job.brief_key) {

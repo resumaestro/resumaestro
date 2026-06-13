@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@slack/types':
+        specifier: ^2.21.1
+        version: 2.21.1
     devDependencies:
       '@cloudflare/workers-types':
         specifier: latest
@@ -386,6 +390,10 @@ packages:
     resolution: {integrity: sha512-P1Cz1dWaFfR4IR+U13mqqiGsLFf1KbayybWwdd2vfctdV6hDpUkgCY0nKOLLTMSoRd/jJNjtbqzf13K8DCCXQw==}
     engines: {node: '>=18'}
 
+  '@slack/types@2.21.1':
+    resolution: {integrity: sha512-I8vmSjNYWsaxuWPx6dz4yeh0h7vRBWbgAMK14LEmblbZ404BtrPbXs6jDPx4cYgGf8msDGF4A9opLZBu21FViQ==}
+    engines: {node: '>= 12.13.0', npm: '>= 6.12.0'}
+
   '@speed-highlight/core@1.2.16':
     resolution: {integrity: sha512-yNm/fYEcnpRjYduLMaddTK9XKYil6xB88+qFg79ZdZhHu1PadfoQmFW7pVTx7FZqMBNcUuThiAhxhENgtAO2/w==}
 
@@ -716,6 +724,8 @@ snapshots:
   '@poppinss/exception@1.2.3': {}
 
   '@sindresorhus/is@7.2.0': {}
+
+  '@slack/types@2.21.1': {}
 
   '@speed-highlight/core@1.2.16': {}
 
