@@ -30,6 +30,20 @@ index_name = "job-role"
 binding = "VEC_CODE"
 index_name = "source-code-rag"
 
+# Secrets Store — Slack app *config* tokens, read at runtime via these bindings
+# (read-only: env.SLACK_CONFIG_TOKEN.get()). Create the store + two secrets, then
+# drop the store id into both bindings AND the SECRETS_STORE_ID var below (the var
+# is what the rotated-token write-back REST call uses, since the binding can't read it).
+[[secrets_store_secrets]]
+binding = "SLACK_CONFIG_TOKEN"
+store_id = "5376e6440f0a470496364c1a036ecac8"
+secret_name = "SLACK_CONFIG_TOKEN"
+
+[[secrets_store_secrets]]
+binding = "SLACK_CONFIG_REFRESH_TOKEN"
+store_id = "5376e6440f0a470496364c1a036ecac8"
+secret_name = "SLACK_CONFIG_REFRESH_TOKEN"
+
 [vars]
 # #orchestra channel id (where the worker drops the control line that wakes the agent)
 SLACK_CHANNEL = "C0BA8G3UFNJ"
@@ -38,6 +52,14 @@ SLACK_CHANNEL = "C0BA8G3UFNJ"
 # Leave blank if the channel trigger mode is "always respond".
 AGENT_MENTION = ""
 
+# ---- /admin/update-manifest ----
+SLACK_APP_ID = "A0BA7JJ1LKX"
+CF_ACCOUNT_ID = "281f6b8969eb59a0dec34daaafd69a29"
+SECRETS_STORE_ID = "5376e6440f0a470496364c1a036ecac8"
+
 # Secrets (do NOT put in this file):
 #   wrangler secret put SLACK_BOT_TOKEN     # xoxb-... bot token, chat:write to #orchestra
-#   wrangler secret put AGENT_API_TOKEN     # bearer token the skills present to /data/*
+#   wrangler secret put AGENT_API_TOKEN     # bearer token the skills present to /data/* and /admin/*
+#   wrangler secret put CF_API_TOKEN        # CF API token w/ Secrets Store Edit — writes rotated Slack
+#                                           # config tokens back to the store. Optional: if unset,
+#                                           # /admin/update-manifest returns the new pair in its response.

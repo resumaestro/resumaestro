@@ -11,6 +11,8 @@
 // what replaced the Composio mcp-cloudflare path, so the skills work in any agent
 // runtime and no Cloudflare API token ever leaves this worker.
 
+import { handleAdmin } from "./routes/admin";
+
 export interface Env {
   JOB_SOURCE: R2Bucket;          // R2 binding (bucket: job-source)
   SLACK_BOT_TOKEN: string;       // secret: wrangler secret put SLACK_BOT_TOKEN
@@ -23,7 +25,16 @@ export interface Env {
   VEC_PEOPLE: VectorizeIndex;    // job-people
   VEC_ROLE: VectorizeIndex;      // job-role
   VEC_CODE: VectorizeIndex;      // source-code-rag
-  AGENT_API_TOKEN: string;       // secret: bearer token the skills present to /data/*
+  AGENT_API_TOKEN: string;       // secret: bearer token the skills present to /data/* and /admin/*
+
+  // ---- /admin: Slack app config tokens, stored in Secrets Store (read-only at runtime) ----
+  SLACK_CONFIG_TOKEN: { get(): Promise<string> };          // store secret: SLACK_CONFIG_TOKEN (xoxe-xoxp-...)
+  SLACK_CONFIG_REFRESH_TOKEN: { get(): Promise<string> };  // store secret: SLACK_CONFIG_REFRESH_TOKEN (xoxe-1-...)
+  SLACK_APP_ID?: string;         // var: default Slack app id (A...); body.app_id overrides
+  // Rotated-token write-back (binding is read-only, so this uses the Secrets Store REST API):
+  CF_ACCOUNT_ID?: string;        // var
+  SECRETS_STORE_ID?: string;     // var: same id as the secrets_store_secrets store_id
+  CF_API_TOKEN?: string;         // secret: CF token w/ Secrets Store Edit; if unset, write-back is skipped
 }
 
 type Action = "apply_requested" | "edit_updated" | "input_provided";
@@ -239,6 +250,11 @@ export default {
     // ---- data plane: binding-backed Cloudflare gateway for the skills ----
     if (url.pathname === "/data" || url.pathname.startsWith("/data/")) {
       return handleData(req, env, url);
+    }
+
+    // ---- admin/control plane: Slack app manifest updates (bearer: AGENT_API_TOKEN) ----
+    if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) {
+      return handleAdmin(req, env, url);
     }
 
     // ---- surface-agnostic JSON endpoint (reused by every future surface) ----
