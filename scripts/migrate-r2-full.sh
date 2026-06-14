@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CF_TOKEN="cfoat_dkSade-igRJ_CO11tHmx3MWpU4RXPXnSE0bm37Ux6_8.xZB37SELLMDBvK2ww-9oUjKOx3ttb_VQvkIl8PlAm3I"
+ACCOUNT_ID="281f6b8969eb59a0dec34daaafd69a29"
+SRC="job-source"
+DST="resumaestro-source"
+TMPDIR_BASE="$HOME/tmp-r2-migrate"
+mkdir -p "$TMPDIR_BASE"
+
+# All keys from the full paginated listing
+KEYS=(
+  "_healthcheck/data-gateway.json"
+  "apply/applied.json"
+  "apply/profile.json"
+  "apply/submissions/benepass-senior-software-engineer-frontend.json"
+  "apply/submissions/bluesky-senior-product-engineer-agentic-systems.json"
+  "apply/submissions/brightwheel-principal-engineer-ai.json"
+  "apply/submissions/clickup-principal-frontend-engineer.json"
+  "apply/submissions/clickup-staff-frontend-engineer.json"
+  "apply/submissions/corner-health-product-engineer.json"
+  "apply/submissions/future-staff-product-engineer.json"
+  "apply/submissions/noctal-engineering-lead-platform-ai.json"
+  "apply/submissions/qualified-principal-swe-fullstack.json"
+  "apply/submissions/qualified-principal-swe-fullstack/confirmation.json"
+  "apply/submissions/qualified-principal-swe-fullstack/resume_qualified.pdf"
+  "apply/submissions/runway-ml-ai-full-stack-engineer.json"
+  "apply/submissions/snap-staff-solutions-engineer-l6.json"
+  "apply/submissions/texture-staff-forward-deployed-engineer.json"
+  "apply/submissions/workos-software-engineer-frontend.json"
+  "apply/submissions/zoom-web-engineer-lead.json"
+  "companies/clickup.json"
+  "companies/corner-health.json"
+  "companies/noctal.json"
+  "companies/qualified.json"
+  "companies/river.json"
+  "companies/runway.json"
+  "companies/snap-inc.json"
+  "companies/terzo.json"
+  "companies/workos.json"
+  "companies/yahoo.json"
+  "companies/zoom.json"
+  "people/runway/anastasis-germanidis.json"
+  "people/runway/cristobal-valenzuela.json"
+  "people/runway/kamil-sindi.json"
+  "roles/ai-full-stack-engineer__runway.json"
+  "roles/clickup/principal-frontend-engineer.json"
+  "roles/clickup/staff-frontend-engineer.json"
+  "roles/principal-product-engineer__yahoo.json"
+  "roles/qualified/principal-software-engineer-pmts-full-stack.json"
+  "roles/river/staff-software-engineer.json"
+  "roles/workos/software-engineer-frontend.json"
+  "roles/yahoo/principal-frontend-web-engineer-mail.json"
+  "roles/yahoo/principal-software-engineer-web.json"
+  "roles/yahoo/senior-full-stack-ai-first.json"
+  "roles/zoom/web-engineer-lead.json"
+  "tuning/insights.json"
+)
+
+for key in "${KEYS[@]}"; do
+  TMPFILE="$TMPDIR_BASE/$(echo "$key" | tr '/' '_')"
+  echo "Downloading: $key"
+  wrangler r2 object get "${SRC}/${key}" --file "$TMPFILE" --remote 2>&1 | grep -v "^$" | grep -v "^─" | grep -v "wrangler" || true
+  echo "Uploading → ${DST}/${key}"
+  wrangler r2 object put "${DST}/${key}" --file "$TMPFILE" --remote 2>&1 | grep -v "^$" | grep -v "^─" | grep -v "wrangler" || true
+  rm -f "$TMPFILE"
+  echo "Done: $key"
+done
+
+echo "Migration complete. Total: ${#KEYS[@]} files."

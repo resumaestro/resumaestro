@@ -1,6 +1,6 @@
 // ---- Slack API helpers + agent wake + thread management ------------------
 
-import type { Env, JobRow } from './types';
+import type { Env, JobRow, ListView, ListOptions } from './types';
 import { updateJob, listJobs } from './db';
 import { createCard } from './build/createCard';
 import { createHome } from './build/createHome';
@@ -59,12 +59,13 @@ export async function openModal(env: Env, triggerId: string, view: object): Prom
 }
 
 // Publish the App Home view for a specific user (idempotent, always replaces).
-export async function publishHome(env: Env, userId: string): Promise<void> {
+export async function publishHome(env: Env, userId: string, view?: ListView, options?: ListOptions): Promise<void> {
   if (!userId) return;
-  const jobs = await listJobs(env, 'active');
+  const resolvedView = view ?? 'jobs';
+  const jobs = await listJobs(env, resolvedView, options);
   await slackApi(env, 'views.publish', {
     user_id: userId,
-    view: { type: 'home', blocks: createHome(jobs) },
+    view: { type: 'home', blocks: createHome(jobs, resolvedView, options) },
   });
 }
 
@@ -72,7 +73,7 @@ export async function publishHome(env: Env, userId: string): Promise<void> {
 export async function uploadToThread(
   env: Env, r2Key: string, channel: string, threadTs: string, title: string, comment: string,
 ): Promise<void> {
-  const obj = await env.JOB_SOURCE.get(r2Key);
+  const obj = await env.RESUMAESTRO_SOURCE.get(r2Key);
   if (!obj) return;
   const bytes = await obj.arrayBuffer();
   const filename = r2Key.split('/').pop() ?? 'file';

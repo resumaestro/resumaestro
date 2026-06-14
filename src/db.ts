@@ -1,6 +1,6 @@
 // ---- D1 + company helpers --------------------------------------------------
 
-import type { Env, JobRow } from './types';
+import type { Env, JobRow, ListView, ListOptions } from './types';
 
 // ---- ID generation --------------------------------------------------------
 
@@ -44,16 +44,28 @@ export async function updateJob(env: Env, id: string, data: Partial<Omit<JobRow,
     .bind(...entries.map(([, v]) => v), id).run();
 }
 
-export async function listJobs(env: Env, filter?: string): Promise<JobRow[]> {
-  let q = 'SELECT * FROM jobs';
-  const map: Record<string, string> = {
-    active: `status NOT IN ('staged','parked','staging','parking')`,
-    staged: `status = 'staged'`,
-    parked: `status = 'parked'`,
-  };
-  if (filter && map[filter]) q += ` WHERE ${map[filter]}`;
-  q += ' ORDER BY updated_at DESC LIMIT 50';
-  const { results } = await env.DB.prepare(q).all<JobRow>();
+export async function listJobs(env: Env, view: ListView, options?: ListOptions): Promise<JobRow[]> {
+  const filterEntries = options?.filter ? Object.entries(options.filter) : [];
+
+  let whereClause: string;
+  let orderClause: string;
+
+  if (view === 'jobs') {
+    whereClause = `job_status = 'EVALUATING'`;
+    orderClause = `in_flight IS NOT NULL DESC, updated_at DESC`;
+  } else if (view === 'pipeline') {
+    whereClause = `stage IS NOT NULL`;
+    orderClause = `CASE stage WHEN 'IDLE' THEN 0 WHEN 'APPLIED' THEN 1 WHEN 'INTERVIEWING' THEN 2 WHEN 'OFFERED' THEN 3 ELSE 4 END, updated_at DESC`;
+  } else {
+    whereClause = `job_status = 'PARKED'`;
+    orderClause = `updated_at DESC`;
+  }
+
+  const filterClauses = filterEntries.map(([field]) => `${field} = ?`);
+  const allClauses = [whereClause, ...filterClauses];
+  const q = `SELECT * FROM jobs WHERE ${allClauses.join(' AND ')} ORDER BY ${orderClause} LIMIT 50`;
+  const bindings = filterEntries.map(([, value]) => value);
+  const { results } = await env.DB.prepare(q).bind(...bindings).all<JobRow>();
   return results;
 }
 

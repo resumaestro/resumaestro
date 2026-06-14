@@ -3,10 +3,9 @@ import type {
   Button,
   KnownBlock,
   MrkdwnElement,
-  SectionBlock,
 } from '@slack/types';
 import type { JobRow } from '#/types';
-import { createButton, createDivider, createMarkdown, createQuoteBlock } from './primitives';
+import { createButton, createMarkdown } from './primitives';
 
 export function createField(label: string, value: string | undefined): MrkdwnElement | null {
   if (!value) {
@@ -53,75 +52,23 @@ export function createScoreFields(
 export function createFooterBlocks(job: JobRow): KnownBlock[] {
   const { id } = job;
 
-  switch (job.status) {
-    case 'scoring':
+  switch (job.in_flight) {
+    case 'SCORING':
       return [createMarkdown('_Scanning listing…_', { withSection: true })];
-
-    case 'research_depth_select':
-      return [
-        {
-          type: 'actions',
-          elements: [
-            createButton('Deep', 'job_research_deep', id),
-            createButton('Surface', 'job_research_surface', id),
-          ],
-        } satisfies ActionsBlock,
-      ];
-
-    case 'researching': {
-      const queuedTailor = job.queued_next === 'tailor_after_research';
-      return [
-        {
-          type: 'section',
-          text: createMarkdown('Researching…'),
-          accessory: createButton(
-            queuedTailor ? 'Stage when complete' : 'Tailor when complete',
-            queuedTailor ? 'job_queue_stage' : 'job_queue_tailor',
-            id,
-          ),
-        } satisfies SectionBlock,
-      ];
-    }
-
-    case 'tailoring': {
-      const queuedStage = job.queued_next === 'stage_after_tailor';
-      return [
-        {
-          type: 'section',
-          text: createMarkdown('Tailoring…'),
-          accessory: createButton(
-            queuedStage ? 'Undo Stage' : 'Stage when complete',
-            queuedStage ? 'job_unqueue_stage' : 'job_queue_stage',
-            id,
-          ),
-        } satisfies SectionBlock,
-      ];
-    }
-
-    case 'parking':
-      return [
-        createQuoteBlock(
-          'Moving thread to #orchestra-parking-lot. This message and thread will soon be deleted.',
-        ),
-      ];
-
-    case 'staging':
-      return [
-        createQuoteBlock(
-          'Moving thread to #orchestra-stage. This message and thread will soon be deleted.',
-        ),
-      ];
-
+    case 'RESEARCHING':
+      return [createMarkdown('_Researching…_', { withSection: true })];
+    case 'TAILORING':
+      return [createMarkdown('_Tailoring…_', { withSection: true })];
+    case 'APPLYING':
+      return [createMarkdown('_Applying…_', { withSection: true })];
     default: {
-      // scored, researched, tailored — the normal action bar
       const elements: Button[] = [];
 
       if (job.research_level === 'none') {
-        elements.push(createButton('Research', 'job_research', id));
+        elements.push(createButton('Research', 'job_research_deep', id));
       } else if (job.research_level === 'surface') {
-        elements.push(createButton('Deep Research', 'job_research_deep', id));
+        elements.push(createButton('Research', 'job_research_deep', id));
       }
-      // research_level === 'deep': already at max depth, no research button
 
       const tailorButton =
         job.tailor_state === 'done'
@@ -129,8 +76,6 @@ export function createFooterBlocks(job: JobRow): KnownBlock[] {
           : createButton('Tailor', 'job_tailor', id, { style: 'primary' });
 
       elements.push(tailorButton);
-      elements.push(createButton('Park', 'job_park', id));
-      elements.push(createButton('Stage', 'job_stage', id));
 
       return [{ type: 'actions', elements } satisfies ActionsBlock];
     }

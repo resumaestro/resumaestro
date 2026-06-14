@@ -13,6 +13,9 @@
 ## Arrays
 - Use `.at(n)` for index access — never `[n]`
 
+## Switch cases
+- Each `case` on its own line — never `case 'a': case 'b': return x` on one line
+
 ## Style
 - No one-liner `if` bodies — always use braces
 - No inline type assertions in array literals — extract to a named variable first
