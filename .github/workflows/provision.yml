@@ -28,8 +28,8 @@ jobs:
         id: provision
         uses: resumaestro/pit-boss/actions/provision@main
         with:
-          production_target: RESUMAESTRO_PIPELINE
-          staging_target: RESUMAESTRO_PIPELINE_STAGING
+          production_target: PRODUCTION
+          staging_target: STAGING
           provision_dir: provision/pipeline
           proxy_url: ${{ vars.OBOIST_URL }}
           proxy_token: ${{ secrets.OBOIST_SECRET }}
