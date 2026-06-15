@@ -4,7 +4,6 @@ import type { Env, JobRow } from '#/types';
 import { verifySlack } from '#/slack';
 import { makeJobId, createJob, updateJob, listJobs } from '#/db';
 import { createCard } from '#/build/createCard';
-import { createJobsList } from '#/build/createJobsList';
 import { postMsg, wakeAgent, publishHome } from '#/slack';
 
 // ---- /commands/add --------------------------------------------------------
@@ -50,8 +49,8 @@ export async function handleAddCommand(env: Env, payload: Record<string, string>
     const existing = await env.DB.prepare('SELECT id FROM jobs WHERE listing_url = ?').bind(url).first<{ id: string }>();
     if (existing) continue;
 
-    // 1. Create D1 row (status: scoring)
-    await createJob(env, { id, listing_url: url, channel_id: channel, owner_id: ownerId, status: 'scoring' });
+    // 1. Create D1 row
+    await createJob(env, { id, listing_url: url, channel_id: channel, owner_id: ownerId, in_flight: 'SCORING', job_status: 'EVALUATING' });
 
     // 2. Post root message — one per job, no thread_ts; this IS the thread anchor
     const rootTs = await postMsg(env, channel, url);
@@ -62,6 +61,10 @@ export async function handleAddCommand(env: Env, payload: Record<string, string>
       work_model: null, comp_text: null, scores_json: null,
       status: 'scoring', research_level: 'none', research_facets: null,
       tailor_state: 'none', queued_next: 'none',
+      in_flight: 'SCORING' as const, job_status: 'EVALUATING' as const, stage: null,
+      research_intent: null, company_url: null, job_url: null,
+      research_summary: null, research_signals_json: null, research_sources_json: null,
+      apply_pending_json: null,
       owner_id: ownerId, channel_id: channel, root_ts: rootTs, card_ts: null,
       html_key: null, brief_key: null, resume_pdf_key: null,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
@@ -108,8 +111,6 @@ export async function handleCommandsRoute(request: Request, env: Env, executionC
 // ---- /commands/jobs --------------------------------------------------------
 
 export async function handleJobsCommand(env: Env, payload: Record<string, string>): Promise<void> {
-  const filter = (payload.text ?? '').trim().toLowerCase() || 'active';
-  const jobs = await listJobs(env, filter);
-  const blocks = createJobsList(jobs, filter);
-  await postMsg(env, payload.channel_id, `Pipeline — ${jobs.length} jobs`, blocks);
+  const jobs = await listJobs(env, 'jobs');
+  await postMsg(env, payload.channel_id, `Pipeline — ${jobs.length} jobs`);
 }

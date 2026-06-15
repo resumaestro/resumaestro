@@ -1,0 +1,20 @@
+cloudflare:
+  scope:
+    - API Tokens Read
+    - Workers Scripts Write
+    - Workers KV Storage Write
+    - D1 Write
+    - Workers R2 Storage Write
+    - Vectorize Write
+  secret:
+    - GEOAPIFY_API_KEY
+    - SLACK_BOT_TOKEN
+    - SLACK_SIGNING_SECRET
+  variable:
+    - SLACK_CHANNEL
+    - SLACK_APP_ID
+github:
+  variable:
+    - OBOIST_URL
+  secret:
+    - OBOIST_SECRET

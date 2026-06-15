@@ -8,10 +8,10 @@
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "baseUrl": ".",
+    "resolveJsonModule": true,
     "paths": {
-      "#/*": ["src/*"]
+      "#/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts"]
 }

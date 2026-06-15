@@ -1,9 +1,9 @@
 name: Push Slack manifest
 
 # When slack-app/manifest.yml changes on main, push it to Slack through the worker's
-# /admin/update-manifest endpoint. The worker holds the Slack *config* tokens (in
+# /admin/update-manifest endpoint. Oboist holds the Slack *config* tokens (in
 # Cloudflare Secrets Store) and rotates/persists them itself, so this job only needs
-# the bearer (AGENT_API_TOKEN) and the worker URL — no Slack or Cloudflare token here.
+# OBOIST_SECRET and the Oboist URL — no Slack or Cloudflare token here.
 
 on:
   push:
@@ -34,13 +34,13 @@ jobs:
 
       - name: POST to /admin/update-manifest
         env:
-          JOB_SLACK_URL: ${{ vars.JOB_SLACK_URL }}
-          AGENT_API_TOKEN: ${{ secrets.AGENT_API_TOKEN }}
+          OBOIST_URL: ${{ vars.OBOIST_URL }}
+          OBOIST_SECRET: ${{ secrets.OBOIST_SECRET }}
         run: |
           set -uo pipefail
           code=$(curl -sS -o resp.json -w '%{http_code}' \
-            -X POST "$JOB_SLACK_URL/admin/update-manifest" \
-            -H "Authorization: Bearer $AGENT_API_TOKEN" \
+            -X POST "$OBOIST_URL/admin/update-manifest" \
+            -H "Authorization: Bearer $OBOIST_SECRET" \
             -H "Content-Type: application/json" \
             --data-binary @body.json || echo "000")
           echo "HTTP $code"; cat resp.json 2>/dev/null; echo
@@ -52,5 +52,5 @@ jobs:
             echo "config token rotated; write_back persisted=$(jq -r '.rotated.write_back.persisted' resp.json)"
           fi
           if jq -e '.rotated.new_tokens' resp.json >/dev/null 2>&1; then
-            echo "::warning::worker returned a new token pair (in-worker write-back not configured). Set CF_API_TOKEN on the worker, or persist these to the store."
+            echo "::warning::Oboist returned a new token pair because Secrets Store write-back failed."
           fi

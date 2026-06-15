@@ -5,10 +5,15 @@
   "description": "Interactivity + input plane for the Job Application Apply agent",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "check": "pnpm run typecheck && pnpm test && wrangler deploy --dry-run"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "latest",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4",
     "wrangler": "latest"
   },
   "dependencies": {
