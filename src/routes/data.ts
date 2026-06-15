@@ -1,6 +1,5 @@
 // ---- Cloudflare data gateway (GET|POST /data/*) ---------------------------
-// Bearer-authenticated. Exposes R2, Vectorize, Workers AI, and D1 to
-// the agent and other internal callers without exposing raw CF credentials.
+// Internal — only reachable via service binding from composer.
 
 import type { Env, JobRow } from '#/types';
 import { createResponseInit } from '#/headers';
@@ -10,12 +9,6 @@ export const EMBED_MODEL = '@cf/qwen/qwen3-embedding-0.6b';
 
 const dj = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), createResponseInit('json', status));
-
-export function bearerOk(request: Request, env: Env): boolean {
-  const h = request.headers.get('Authorization') ?? '';
-  const tok = h.startsWith('Bearer ') ? h.slice(7).trim() : '';
-  return Boolean(env.AGENT_API_TOKEN) && tok === env.AGENT_API_TOKEN;
-}
 
 function vecIndex(env: Env, name: string): VectorizeIndex | null {
   switch (String(name ?? '').toLowerCase()) {
@@ -54,7 +47,6 @@ export async function handleData(
   env: Env,
   _executionContext: ExecutionContext,
 ): Promise<Response> {
-  if (!bearerOk(request, env)) return dj({ error: 'unauthorized' }, 401);
   const url = new URL(request.url);
   const p = url.pathname;
 

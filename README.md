@@ -14,6 +14,7 @@ The **control plane**. Owns the Slack surface, the job pipeline state, and the h
 - Receive composer results at `POST /jobs/:id/result` and write them back to D1
 - Refresh the App Home after every state change
 - Expose raw Cloudflare resources (R2, Vectorize, AI, D1) to the composer via the `/data/*` gateway, bearer-authenticated
+- Resolve job locations with Nominatim and calculate drive/transit commutes with Geoapify for Conductor via `/commute/*`
 
 ## What it does not own
 
@@ -109,6 +110,7 @@ The composer uses these to read source files (experience.yml, listing HTML) and 
 npx wrangler secret put SLACK_BOT_TOKEN
 npx wrangler secret put SLACK_SIGNING_SECRET
 npx wrangler secret put AGENT_API_TOKEN
+npx wrangler secret put GEOAPIFY_API_KEY
 npx wrangler deploy
 ```
 

@@ -1,0 +1,4 @@
+{
+  "model:resume": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+  "model:embedding": "@cf/qwen/qwen3-embedding-0.6b"
+}

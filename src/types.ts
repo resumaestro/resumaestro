@@ -9,24 +9,14 @@ export interface Env {
   SLACK_BOT_TOKEN: string;
   SLACK_SIGNING_SECRET: string;
   SLACK_CHANNEL: string; // #orchestra  (C0BA8G3UFNJ)
-  STAGE_CHANNEL: string; // #orchestra-stage
-  PARKING_LOT_CHANNEL: string; // #orchestra-parking-lot
-  AGENT_MENTION?: string; // "<@U...>" if channel is mentions-only
+  GEOAPIFY_API_KEY: string;
 
   // Agent
-  AGENT_WEBHOOK_URL: string; // Hyperagent webhook URL for the single Conductor agent
-  AGENT_API_TOKEN: string; // shared bearer for /data/*, /jobs/:id/result, /admin/*
-
-  // Slack config tokens — Secrets Store bindings (read via .get())
-  SLACK_APP_ID: string;
-  SLACK_CONFIG_TOKEN: { get(): Promise<string> };
-  SLACK_CONFIG_REFRESH_TOKEN: { get(): Promise<string> };
-  SECRETS_STORE_ID: string;
-  CF_API_TOKEN?: string;
-  CF_ACCOUNT_ID?: string;
+  COMPOSER: Fetcher;
 
   // Workers AI + Vectorize (data gateway)
   AI: { run: (model: string, inputs: unknown) => Promise<unknown> };
+  RESUMAESTRO_CONFIG: KVNamespace;
   RESUMAESTRO_COMPANIES: VectorizeIndex;
   RESUMAESTRO_TEAMMEMBERS: VectorizeIndex;
   RESUMAESTRO_ROLES: VectorizeIndex;

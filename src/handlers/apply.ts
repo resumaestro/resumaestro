@@ -28,7 +28,6 @@ async function notifyAgent(
   action: ApplyAction,
   id: string,
 ): Promise<void> {
-  const mention = env.AGENT_MENTION ? `${env.AGENT_MENTION} ` : '';
   await fetch('https://slack.com/api/chat.postMessage', {
     method: 'POST',
     headers: {
@@ -37,7 +36,7 @@ async function notifyAgent(
     },
     body: JSON.stringify({
       channel: env.SLACK_CHANNEL,
-      text: `${mention}apply-worker | ${action} | ${id}`,
+      text: `apply-worker | ${action} | ${id}`,
     }),
   });
 }
