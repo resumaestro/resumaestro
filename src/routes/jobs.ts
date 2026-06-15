@@ -2,14 +2,14 @@
 
 import type { Env } from '#/types';
 import { createResponseInit } from '#/headers';
-import { bearerOk } from './data';
+import { bearer } from './data';
 import { handleJobResult } from '#/handlers/result';
 
 export async function handleJobsRoute(request: Request, env: Env, _executionContext: ExecutionContext): Promise<Response> {
   const pathname = new URL(request.url).pathname;
   const resultMatch = pathname.match(/^\/jobs\/([^/]+)\/result$/);
   if (resultMatch && request.method === 'POST') {
-    if (!bearerOk(request, env)) {
+    if (!bearer(request, env)) {
       return new Response(JSON.stringify({ error: 'unauthorized' }), createResponseInit('json', 401));
     }
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
