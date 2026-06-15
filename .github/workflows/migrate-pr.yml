@@ -30,7 +30,7 @@ jobs:
         id: dry-run
         uses: resumaestro/pit-boss/actions/dry-run@main
         with:
-          target: RUSUMAESTRO_PIPELINE_SANDBOX
+          target: RESUMAESTRO_PIPELINE_SANDBOX
           proxy_url: ${{ vars.OBOIST_URL }}
           proxy_token: ${{ secrets.OBOIST_SECRET }}
 
