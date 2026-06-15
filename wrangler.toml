@@ -2,16 +2,21 @@ name = "resumaestro-resumaestro"
 main = "src/server.ts"
 compatibility_date = "2025-01-01"
 
+[observability]
+enabled = true
+invocation_logs = true
+head_sampling_rate = 1
+
 # R2: shared source-of-truth bucket.
 [[r2_buckets]]
-binding = "JOB_SOURCE"
-bucket_name = "job-source"
+binding = "RESUMAESTRO_SOURCE"
+bucket_name = "resumaestro-source"
 
 # D1: queryable pipeline record (companies + jobs).
 [[d1_databases]]
 binding = "DB"
-database_name = "job-pipeline"
-database_id = "316f5071-ab12-42c4-90e8-18a8f090a016"
+database_name = "resumaestro-pipeline"
+database_id = "72bff802-4593-4ed3-9c4f-1923bcb1b406"
 
 # Workers AI — embeddings for the /data gateway.
 [ai]
@@ -19,43 +24,34 @@ binding = "AI"
 
 # Vectorize — four indices, 1024-dim cosine.
 [[vectorize]]
-binding = "VEC_COMPANY"
+binding = "RESUMAESTRO_COMPANIES"
 index_name = "resumaestro-companies"
 
 [[vectorize]]
-binding = "VEC_PEOPLE"
+binding = "RESUMAESTRO_TEAMMEMBERS"
 index_name = "resumaestro-teammembers"
 
 [[vectorize]]
-binding = "VEC_ROLE"
+binding = "RESUMAESTRO_ROLES"
 index_name = "resumaestro-roles"
 
 [[vectorize]]
 binding = "VEC_CODE"
 index_name = "source-code-rag"
 
-# Secrets Store — Slack app config tokens (read-only at runtime via .get()).
-[[secrets_store_secrets]]
-binding = "SLACK_CONFIG_TOKEN"
-store_id = "5376e6440f0a470496364c1a036ecac8"
-secret_name = "SLACK_CONFIG_TOKEN"
+# Service binding to composer (intelligence plane).
+[[services]]
+binding = "COMPOSER"
+service = "resumaestro-composer"
 
-[[secrets_store_secrets]]
-binding = "SLACK_CONFIG_REFRESH_TOKEN"
-store_id = "5376e6440f0a470496364c1a036ecac8"
-secret_name = "SLACK_CONFIG_REFRESH_TOKEN"
+# KV — dynamic config: model names, feature flags.
+[[kv_namespaces]]
+binding = "RESUMAESTRO_CONFIG"
+id = "0178e5c12f4945f0a230ac7d1f04b4fa"
 
-[vars]
-SLACK_CHANNEL = "C0BA8G3UFNJ"
-STAGE_CHANNEL = ""
-PARKING_LOT_CHANNEL = ""
-AGENT_WEBHOOK_URL = ""
-SLACK_APP_ID = "A0BA7JJ1LKX"
-CF_ACCOUNT_ID = "281f6b8969eb59a0dec34daaafd69a29"
-SECRETS_STORE_ID = "5376e6440f0a470496364c1a036ecac8"
-
-# Secrets (do NOT put in this file):
-#   wrangler secret put SLACK_BOT_TOKEN       # xoxb-... chat:write + files:write
-#   wrangler secret put SLACK_SIGNING_SECRET  # slash commands + interactivity verification
-#   wrangler secret put AGENT_API_TOKEN       # bearer for /data/*, /jobs/:id/result, /admin/*
-#   wrangler secret put CF_API_TOKEN          # CF token w/ Secrets Store Edit (for token write-back)
+[secrets]
+required = [`
+  "SLACK_BOT_TOKEN",              # xoxb-... chat:write + files:write
+  "SLACK_SIGNING_SECRET",         # slash commands + interactivity verification
+  "GEOAPIFY_API_KEY",             # commute routing API key
+]

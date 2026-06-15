@@ -1,6 +1,6 @@
 // ---- Slack API helpers + agent wake + thread management ------------------
 
-import type { Env, JobRow } from './types';
+import type { Env, JobRow, ListView, ListOptions } from './types';
 import { updateJob, listJobs } from './db';
 import { createCard } from './build/createCard';
 import { createHome } from './build/createHome';
@@ -59,12 +59,13 @@ export async function openModal(env: Env, triggerId: string, view: object): Prom
 }
 
 // Publish the App Home view for a specific user (idempotent, always replaces).
-export async function publishHome(env: Env, userId: string): Promise<void> {
+export async function publishHome(env: Env, userId: string, view?: ListView, options?: ListOptions): Promise<void> {
   if (!userId) return;
-  const jobs = await listJobs(env, 'active');
+  const resolvedView = view ?? 'jobs';
+  const jobs = await listJobs(env, resolvedView, options);
   await slackApi(env, 'views.publish', {
     user_id: userId,
-    view: { type: 'home', blocks: createHome(jobs) },
+    view: { type: 'home', blocks: createHome(jobs, resolvedView, options) },
   });
 }
 
@@ -72,7 +73,7 @@ export async function publishHome(env: Env, userId: string): Promise<void> {
 export async function uploadToThread(
   env: Env, r2Key: string, channel: string, threadTs: string, title: string, comment: string,
 ): Promise<void> {
-  const obj = await env.JOB_SOURCE.get(r2Key);
+  const obj = await env.RESUMAESTRO_SOURCE.get(r2Key);
   if (!obj) return;
   const bytes = await obj.arrayBuffer();
   const filename = r2Key.split('/').pop() ?? 'file';
@@ -104,52 +105,15 @@ export async function uploadToThread(
 // ---- Wake agent ------------------------------------------------------------
 
 export async function wakeAgent(env: Env, mode: string, jobId: string | null, extra?: Record<string, unknown>): Promise<void> {
-  if (!env.AGENT_WEBHOOK_URL) return;
   const body: Record<string, unknown> = { mode, ...(extra ?? {}) };
   if (jobId) {
     body.job_id = jobId;
     body.callback_url = `https://job-slack.cameronaziz.workers.dev/jobs/${jobId}/result`;
   }
-  await fetch(env.AGENT_WEBHOOK_URL, {
+  await env.COMPOSER.fetch('https://worker/agent', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.AGENT_API_TOKEN}` },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 }
 
-// ---- Move thread -----------------------------------------------------------
-
-export async function moveThread(env: Env, job: JobRow, destChannel: string): Promise<void> {
-  if (!job.channel_id || !job.root_ts) return;
-
-  const threadRes = await slackApi(env, 'conversations.replies', {
-    channel: job.channel_id,
-    ts: job.root_ts,
-    limit: 100,
-  }) as { messages?: Array<{ ts: string; text?: string }> };
-  const messages = threadRes.messages ?? [];
-  const rootText = messages[0]?.text ?? job.listing_url ?? '';
-
-  // Post root + card to destination
-  const newRootTs = await postMsg(env, destChannel, rootText);
-  const movedJob = { ...job, channel_id: destChannel, root_ts: newRootTs } as JobRow;
-  const newCardTs = await postMsg(env, destChannel, `${job.company ?? ''} — ${job.role ?? ''}`, createCard(movedJob), newRootTs);
-
-  // Re-upload brief + resume if stored in R2
-  if (job.brief_key) {
-    await uploadToThread(env, job.brief_key, destChannel, newRootTs, 'Research Brief', 'Re-attached from pipeline move.');
-  }
-  if (job.resume_pdf_key) {
-    await uploadToThread(env, job.resume_pdf_key, destChannel, newRootTs, 'Tailored Resume', 'Re-attached from pipeline move.');
-  }
-
-  // Delete original thread (replies first, then root) — best-effort
-  for (const msg of messages.slice(1).reverse()) {
-    await deleteMsg(env, job.channel_id, msg.ts).catch(() => {});
-  }
-  await deleteMsg(env, job.channel_id, job.root_ts).catch(() => {});
-
-  // Update D1
-  const newStatus = destChannel === env.PARKING_LOT_CHANNEL ? 'parked' : 'staged';
-  await updateJob(env, job.id, { status: newStatus, channel_id: destChannel, root_ts: newRootTs, card_ts: newCardTs });
-}

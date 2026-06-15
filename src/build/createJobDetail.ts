@@ -1,5 +1,5 @@
-import type { KnownBlock, SectionBlock } from '@slack/types';
-import type { JobRow, ResearchFacets } from '#/types';
+import type { ContextBlock, KnownBlock, MrkdwnElement, SectionBlock } from '@slack/types';
+import type { JobRow, ResearchFacets, ResearchSignal, ApplyQuestion } from '#/types';
 import { createScoreFields } from './blocks/components';
 import { createDivider, createMarkdown, createPlainText } from './blocks/primitives';
 
@@ -45,6 +45,60 @@ export function createJobDetail(job: JobRow): object {
   }
 
   blocks.push(createMarkdown(createStatusLine(job), { withSection: true }));
+
+  const links: string[] = [];
+  if (job.company_url) {
+    links.push(`<${job.company_url}|Company Website>`);
+  }
+  if (job.job_url) {
+    links.push(`<${job.job_url}|Job Posting>`);
+  }
+  if (links.length > 0) {
+    blocks.push(createMarkdown(links.join('  ·  '), { withSection: true }));
+  }
+
+  if (job.research_summary) {
+    blocks.push(createMarkdown(job.research_summary, { withSection: true }));
+  }
+
+  if (job.research_signals_json) {
+    try {
+      const signals = JSON.parse(job.research_signals_json) as ResearchSignal[];
+      const signalElements: MrkdwnElement[] = signals
+        .slice(0, 5)
+        .map(signal => createMarkdown(`<${signal.url}|${signal.title}>  ${signal.snippet}`));
+      if (signalElements.length > 0) {
+        const signalsBlock: ContextBlock = { type: 'context', elements: signalElements };
+        blocks.push(signalsBlock);
+      }
+    } catch {
+      /* skip */
+    }
+  }
+
+  if (job.research_sources_json) {
+    try {
+      const sources = JSON.parse(job.research_sources_json) as Array<{ url: string; title: string }>;
+      const sourceLines = sources.map(source => `• <${source.url}|${source.title}>`);
+      if (sourceLines.length > 0) {
+        blocks.push(createMarkdown(sourceLines.join('\n'), { withSection: true }));
+      }
+    } catch {
+      /* skip */
+    }
+  }
+
+  if (job.apply_pending_json) {
+    try {
+      const questions = JSON.parse(job.apply_pending_json) as ApplyQuestion[];
+      const questionLines = questions.map(question => `• *${question.field}*: ${question.question}`);
+      if (questionLines.length > 0) {
+        blocks.push(createMarkdown(`_Outstanding questions:_\n${questionLines.join('\n')}`, { withSection: true }));
+      }
+    } catch {
+      /* skip */
+    }
+  }
 
   if (job.channel_id && job.root_ts) {
     const tsSafe = job.root_ts.replace('.', '');

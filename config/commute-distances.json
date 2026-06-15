@@ -1,0 +1,13 @@
+{
+  "distanceUnit": "kilometers",
+  "commuteTypes": {
+    "transit": {
+      "geoapifyMode": "transit",
+      "maxDistance": 50
+    },
+    "drive": {
+      "geoapifyMode": "drive",
+      "maxDistance": 80
+    }
+  }
+}

@@ -39,7 +39,14 @@ export async function handleSlackRoute(request: Request, env: Env, executionCont
     const action = payload.type === 'block_actions'
       ? (actions.at(0)?.action_id as string)
       : null;
-    const isModalOpen = action === 'job_research_deep' || action === 'job_refine' || action === 'job_view_modal';
+    const SYNC_ACTIONS = new Set([
+      'job_research_deep',
+      'job_refine',
+      'job_view_modal',
+      'job_apply',
+      'manager_facet_toggle',
+    ]);
+    const isModalOpen = action !== null && SYNC_ACTIONS.has(action);
 
     if (isModalOpen) {
       await handleInteractivity(env, payload);

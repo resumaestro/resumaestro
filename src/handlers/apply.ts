@@ -8,7 +8,7 @@ export async function getSubmission(
   env: Env,
   id: string,
 ): Promise<Record<string, unknown> | null> {
-  const obj = await env.JOB_SOURCE.get(applyKey(id));
+  const obj = await env.RESUMAESTRO_SOURCE.get(applyKey(id));
   return obj ? (obj.json() as Promise<Record<string, unknown>>) : null;
 }
 
@@ -18,7 +18,7 @@ export async function putSubmission(
   data: Record<string, unknown>,
 ): Promise<void> {
   data.updated_at = new Date().toISOString();
-  await env.JOB_SOURCE.put(applyKey(id), JSON.stringify(data, null, 2), {
+  await env.RESUMAESTRO_SOURCE.put(applyKey(id), JSON.stringify(data, null, 2), {
     httpMetadata: { contentType: 'application/json' },
   });
 }
@@ -28,7 +28,6 @@ async function notifyAgent(
   action: ApplyAction,
   id: string,
 ): Promise<void> {
-  const mention = env.AGENT_MENTION ? `${env.AGENT_MENTION} ` : '';
   await fetch('https://slack.com/api/chat.postMessage', {
     method: 'POST',
     headers: {
@@ -37,7 +36,7 @@ async function notifyAgent(
     },
     body: JSON.stringify({
       channel: env.SLACK_CHANNEL,
-      text: `${mention}apply-worker | ${action} | ${id}`,
+      text: `apply-worker | ${action} | ${id}`,
     }),
   });
 }
