@@ -1,10 +1,10 @@
 display_information:
-  name: Resumaestro
+  name: Conductor
   description: Job Application Bot
-  background_color: "#996139"
+  background_color: "#004492"
 features:
   bot_user:
-    display_name: resumaestro
+    display_name: conductor
     always_online: true
   app_home:
     home_tab_enabled: true
@@ -17,6 +17,8 @@ features:
       usage_hint: "{link}"
       should_escape: false
 oauth_config:
+  redirect_urls:
+    - https://hyperagent.com/api/slack/oauth/callback
   scopes:
     user:
       - channels:history
