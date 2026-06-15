@@ -4,7 +4,6 @@ compatibility_date = "2025-01-01"
 
 [observability]
 enabled = true
-invocation_logs = true
 head_sampling_rate = 1
 
 # R2: shared source-of-truth bucket.
@@ -50,7 +49,7 @@ binding = "RESUMAESTRO_CONFIG"
 id = "0178e5c12f4945f0a230ac7d1f04b4fa"
 
 [secrets]
-required = [`
+required = [
   "SLACK_BOT_TOKEN",              # xoxb-... chat:write + files:write
   "SLACK_SIGNING_SECRET",         # slash commands + interactivity verification
   "GEOAPIFY_API_KEY",             # commute routing API key
