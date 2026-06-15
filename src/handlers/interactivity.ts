@@ -103,7 +103,7 @@ async function handleBlockActions(env: Env, payload: Record<string, unknown>, us
   const container = payload.container as Record<string, string> | undefined;
 
   if (actionId.startsWith('home_tab:') || actionId.startsWith('home_sort:') || actionId.startsWith('home_filter:')) {
-    await handleHomeTab(env, actionId, userId);
+    await handleHomeTab(env, actionId, action, userId);
     return;
   }
 
@@ -201,20 +201,21 @@ async function handleBlockActions(env: Env, payload: Record<string, unknown>, us
   }
 }
 
-async function handleHomeTab(env: Env, actionId: string, userId: string): Promise<void> {
+async function handleHomeTab(env: Env, actionId: string, action: Record<string, unknown>, userId: string): Promise<void> {
   if (actionId.startsWith('home_tab:')) {
     const view = actionId.slice('home_tab:'.length) as ListView;
     await publishHome(env, userId, view);
   } else if (actionId.startsWith('home_sort:')) {
-    const parts = actionId.split(':');
-    const field = parts.at(1) ?? '';
-    const view = (parts.at(2) ?? 'jobs') as ListView;
+    const view = (actionId.split(':').at(1) ?? 'jobs') as ListView;
+    const selected = action.selected_option as Record<string, string> | undefined;
+    const field = selected?.value ?? 'updated';
     await publishHome(env, userId, view, { sort: field });
   } else if (actionId.startsWith('home_filter:')) {
     const parts = actionId.split(':');
     const field = parts.at(1) ?? '';
-    const value = parts.at(2) ?? '';
-    const view = (parts.at(3) ?? 'jobs') as ListView;
+    const view = (parts.at(2) ?? 'jobs') as ListView;
+    const selected = action.selected_option as Record<string, string> | undefined;
+    const value = selected?.value ?? '';
     await publishHome(env, userId, view, { filter: { [field]: value } });
   }
 }

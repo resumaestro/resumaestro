@@ -34,10 +34,10 @@ function createNavButtons(view: ListView): Button[] {
   ];
 }
 
-function createSortFilterRow(): ActionsBlock {
+function createSortFilterRow(view: ListView): ActionsBlock {
   const sortSelect: StaticSelect = {
     type: 'static_select',
-    action_id: 'home_sort',
+    action_id: `home_sort:${view}`,
     placeholder: createPlainText('Sort'),
     options: [
       { text: createPlainText('Recently Updated'), value: 'updated' } satisfies Option,
@@ -47,7 +47,7 @@ function createSortFilterRow(): ActionsBlock {
 
   const filterSelect: StaticSelect = {
     type: 'static_select',
-    action_id: 'home_filter_work_model',
+    action_id: `home_filter:work_model:${view}`,
     placeholder: createPlainText('Work Model'),
     options: [
       { text: createPlainText('All'), value: 'all' } satisfies Option,
@@ -220,7 +220,7 @@ function createJobsView(jobs: JobRow[]): KnownBlock[] {
 
   const navBlock: ActionsBlock = { type: 'actions', elements: navButtons };
 
-  const blocks: KnownBlock[] = [headerBlock, navBlock, createSortFilterRow()];
+  const blocks: KnownBlock[] = [headerBlock, navBlock, createSortFilterRow('jobs')];
 
   if (jobs.length === 0) {
     blocks.push(createMarkdown('_No active jobs. Use /add {url} to get started._', { withSection: true }));

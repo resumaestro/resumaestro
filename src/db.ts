@@ -50,15 +50,17 @@ export async function listJobs(env: Env, view: ListView, options?: ListOptions):
   let whereClause: string;
   let orderClause: string;
 
+  const sortField = options?.sort === 'created' ? 'created_at' : 'updated_at';
+
   if (view === 'jobs') {
     whereClause = `job_status = 'EVALUATING'`;
-    orderClause = `in_flight IS NOT NULL DESC, updated_at DESC`;
+    orderClause = `in_flight IS NOT NULL DESC, ${sortField} DESC`;
   } else if (view === 'pipeline') {
     whereClause = `stage IS NOT NULL`;
-    orderClause = `CASE stage WHEN 'IDLE' THEN 0 WHEN 'APPLIED' THEN 1 WHEN 'INTERVIEWING' THEN 2 WHEN 'OFFERED' THEN 3 ELSE 4 END, updated_at DESC`;
+    orderClause = `CASE stage WHEN 'IDLE' THEN 0 WHEN 'APPLIED' THEN 1 WHEN 'INTERVIEWING' THEN 2 WHEN 'OFFERED' THEN 3 ELSE 4 END, ${sortField} DESC`;
   } else {
     whereClause = `job_status = 'PARKED'`;
-    orderClause = `updated_at DESC`;
+    orderClause = `${sortField} DESC`;
   }
 
   const filterClauses = filterEntries.map(([field]) => `${field} = ?`);
