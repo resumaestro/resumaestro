@@ -1,9 +1,0 @@
-{
-  "model:research:surface": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-  "model:apply": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-  "model:research:deep": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-  "model:resume:refine": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-  "model:resume:build": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-  "model:company:query": "@cf/qwen/qwen3-embedding-0.6b",
-  "model:company:write": "@cf/qwen/qwen3-embedding-0.6b"
-}

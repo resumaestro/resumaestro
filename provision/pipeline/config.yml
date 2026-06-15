@@ -1,4 +1,4 @@
 operation_versions:
-  migration: 4
+  migration: 0
   seed: 0
   apply: 0
