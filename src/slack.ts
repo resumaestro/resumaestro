@@ -108,7 +108,6 @@ export async function wakeAgent(env: Env, mode: string, jobId: string | null, ex
   const body: Record<string, unknown> = { mode, ...(extra ?? {}) };
   if (jobId) {
     body.job_id = jobId;
-    body.callback_url = `https://job-slack.cameronaziz.workers.dev/jobs/${jobId}/result`;
   }
   await env.COMPOSER.fetch('https://worker/agent', {
     method: 'POST',
